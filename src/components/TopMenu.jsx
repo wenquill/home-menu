@@ -68,6 +68,7 @@ export default function TopMenu({
   currentUser,
   isAdmin,
   hasProjectAccess,
+  canViewProjectTab,
   showCategoryControls,
   onLogout,
   onOpenAddCategory,
@@ -220,9 +221,11 @@ export default function TopMenu({
                     <NavLink to="/favorites" className={linkClass}>
                       Улюблені
                     </NavLink>
-                    <NavLink to="/project" className={linkClass}>
-                      Проєкт
-                    </NavLink>
+                    {canViewProjectTab ? (
+                      <NavLink to="/project" className={linkClass}>
+                        Проєкт
+                      </NavLink>
+                    ) : null}
                     <button
                       type="button"
                       className="menu-link menu-link--button"

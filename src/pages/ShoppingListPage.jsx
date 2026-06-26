@@ -180,7 +180,7 @@ export default function ShoppingListPage({
         {error ? <p className="state-message state-message--error">{error}</p> : null}
       </section>
 
-      <section className="admin-panel" aria-label="Елементи списку покупок">
+      <section className="admin-panel-list" aria-label="Елементи списку покупок">
         {isLoading ? <p className="state-message">Завантаження списку...</p> : null}
 
         {!isLoading && visibleItems.length === 0 ? (

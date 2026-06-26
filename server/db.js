@@ -427,6 +427,7 @@ export function initializeDatabase() {
       user_id INTEGER NOT NULL,
       project_id INTEGER NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('OWNER', 'MEMBER')),
+      permissions_role TEXT NOT NULL DEFAULT 'MEMBER',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -676,6 +677,7 @@ export function initializeDatabase() {
         user_id INTEGER NOT NULL,
         project_id INTEGER NOT NULL,
         role TEXT NOT NULL CHECK (role IN ('OWNER', 'MEMBER')),
+        permissions_role TEXT NOT NULL DEFAULT 'MEMBER',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -685,6 +687,20 @@ export function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
     `)
   }
+
+  const hasMembershipPermissionsRoleColumn = membershipColumns.some((column) => column.name === 'permissions_role')
+  if (hasMembershipsTable && !hasMembershipPermissionsRoleColumn) {
+    db.exec("ALTER TABLE project_memberships ADD COLUMN permissions_role TEXT NOT NULL DEFAULT 'MEMBER'")
+  }
+
+  db.prepare(
+    `UPDATE project_memberships
+     SET permissions_role = CASE
+       WHEN role = 'OWNER' THEN 'EDITOR'
+       ELSE 'MEMBER'
+     END
+     WHERE permissions_role IS NULL OR TRIM(permissions_role) = ''`,
+  ).run()
 
   const activityLogColumns = db.prepare("PRAGMA table_info('activity_logs')").all()
   const hasActivityLogTable = activityLogColumns.length > 0
@@ -759,8 +775,8 @@ export function initializeDatabase() {
   const defaultProject = ensureDefaultProject()
 
   db.prepare(
-    `INSERT OR IGNORE INTO project_memberships (user_id, project_id, role)
-     SELECT id, ?, 'OWNER' FROM users WHERE role = 'ADMIN'`,
+     `INSERT OR IGNORE INTO project_memberships (user_id, project_id, role, permissions_role)
+      SELECT id, ?, 'OWNER', 'EDITOR' FROM users WHERE role = 'ADMIN'`,
   ).run(defaultProject.id)
 
   db.prepare(
@@ -1470,6 +1486,7 @@ export function getProjectsForUser(userId) {
         p.id,
         p.name,
         m.role,
+        m.permissions_role AS permissionsRole,
         p.created_at AS createdAt
        FROM project_memberships m
        JOIN projects p ON p.id = m.project_id
@@ -1502,8 +1519,8 @@ export function createProject({ name, createdByUserId }) {
 
   const projectId = Number(result.lastInsertRowid)
 
-  db.prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role) VALUES (?, ?, ?)')
-    .run(createdByUserId, projectId, 'OWNER')
+  db.prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role, permissions_role) VALUES (?, ?, ?, ?)')
+    .run(createdByUserId, projectId, 'OWNER', 'EDITOR')
 
   db.prepare('UPDATE users SET current_project_id = ? WHERE id = ?')
     .run(projectId, createdByUserId)
@@ -1513,10 +1530,11 @@ export function createProject({ name, createdByUserId }) {
 
 export function addProjectMembership({ userId, projectId, role = 'MEMBER' }) {
   const normalizedRole = String(role || '').toUpperCase() === 'OWNER' ? 'OWNER' : 'MEMBER'
+  const permissionsRole = normalizedRole === 'OWNER' ? 'EDITOR' : 'MEMBER'
 
   const result = db
-    .prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role) VALUES (?, ?, ?)')
-    .run(userId, projectId, normalizedRole)
+    .prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role, permissions_role) VALUES (?, ?, ?, ?)')
+    .run(userId, projectId, normalizedRole, permissionsRole)
 
   db.prepare(
     `UPDATE users
@@ -1543,6 +1561,55 @@ export function getProjectRoleForUser(userId, projectId) {
   return row?.role || null
 }
 
+export function getProjectPermissionsRoleForUser(userId, projectId) {
+  const row = db
+    .prepare('SELECT permissions_role AS permissionsRole FROM project_memberships WHERE user_id = ? AND project_id = ? LIMIT 1')
+    .get(userId, projectId)
+
+  return String(row?.permissionsRole || 'MEMBER').toUpperCase()
+}
+
+export function updateProjectMemberPermissionsRole({ userId, projectId, permissionsRole }) {
+  const normalized = String(permissionsRole || '').toUpperCase() === 'EDITOR' ? 'EDITOR' : 'MEMBER'
+
+  const membership = db
+    .prepare('SELECT role FROM project_memberships WHERE user_id = ? AND project_id = ? LIMIT 1')
+    .get(userId, projectId)
+
+  if (!membership) {
+    return null
+  }
+
+  if (membership.role === 'OWNER') {
+    return {
+      userId,
+      projectId,
+      role: membership.role,
+      permissionsRole: 'EDITOR',
+    }
+  }
+
+  db
+    .prepare(
+      `UPDATE project_memberships
+       SET permissions_role = ?
+       WHERE user_id = ? AND project_id = ?`,
+    )
+    .run(normalized, userId, projectId)
+
+  return db
+    .prepare(
+      `SELECT
+        user_id AS userId,
+        project_id AS projectId,
+        role,
+        permissions_role AS permissionsRole
+       FROM project_memberships
+       WHERE user_id = ? AND project_id = ?`,
+    )
+    .get(userId, projectId)
+}
+
 export function setCurrentProjectForUser(userId, projectId) {
   db.prepare('UPDATE users SET current_project_id = ? WHERE id = ?').run(projectId, userId)
   return getUserById(userId)
@@ -1566,6 +1633,7 @@ export function getProjectMembers(projectId) {
         u.avatar_url AS avatarUrl,
         u.current_project_id AS currentProjectId,
         m.role,
+        m.permissions_role AS permissionsRole,
         m.created_at AS joinedAt
        FROM project_memberships m
        JOIN users u ON u.id = m.user_id

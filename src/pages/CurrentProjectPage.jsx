@@ -6,6 +6,7 @@ export default function CurrentProjectPage({
   onInviteToCurrentProject,
   onLoadCurrentProjectMembers,
   onRemoveMemberFromCurrentProject,
+  onUpdateMemberRoleInCurrentProject,
 }) {
   const [project, setProject] = useState(null)
   const [members, setMembers] = useState([])
@@ -18,6 +19,7 @@ export default function CurrentProjectPage({
   const [membersError, setMembersError] = useState('')
   const [membersMessage, setMembersMessage] = useState('')
   const [removingMemberId, setRemovingMemberId] = useState(null)
+  const [updatingRoleMemberId, setUpdatingRoleMemberId] = useState(null)
   const canInvite = project?.role === 'OWNER' || currentUser?.role === 'ADMIN'
   const canManageMembers = canInvite
 
@@ -106,13 +108,42 @@ export default function CurrentProjectPage({
     }
   }
 
+  const updateMemberRole = async (member, nextPermissionsRole) => {
+    const memberId = Number(member?.id)
+    if (!Number.isInteger(memberId) || memberId < 1) {
+      return
+    }
+
+    if (member.permissionsRole === nextPermissionsRole) {
+      return
+    }
+
+    setMembersError('')
+    setMembersMessage('')
+    setUpdatingRoleMemberId(memberId)
+
+    try {
+      const updated = await onUpdateMemberRoleInCurrentProject?.(memberId, nextPermissionsRole)
+      setMembers((prev) => prev.map((item) => (
+        item.id === memberId
+          ? { ...item, permissionsRole: updated?.permissionsRole || nextPermissionsRole }
+          : item
+      )))
+      setMembersMessage('Роль учасника оновлено')
+    } catch (updateError) {
+      setMembersError(updateError.message)
+    } finally {
+      setUpdatingRoleMemberId(null)
+    }
+  }
+
   return (
     <main className="category-page">
       <h1 className="category-title">поточний проєкт</h1>
 
       <section className="admin-panel" aria-label="Інформація про поточний проєкт">
         {isLoading ? <p className="state-message">Завантаження проєкту...</p> : null}
-        {error ? <p className="state-message state-message--error">{error}</p> : null}
+        {error ? <p className="state-message empty-category-state">{error}</p> : null}
 
         {!isLoading && !error && project ? (
           <>
@@ -153,6 +184,8 @@ export default function CurrentProjectPage({
                   {members.map((member) => {
                     const isCurrentUser = Number(member.id) === Number(currentUser?.id)
                     const canRemoveMember = canManageMembers && !isCurrentUser
+                    const canEditPermissions = canManageMembers && member.role !== 'OWNER'
+                    const currentPermissionsRole = String(member.permissionsRole || 'MEMBER').toUpperCase()
 
                     return (
                       <li key={member.id} className="project-members-item">
@@ -165,10 +198,27 @@ export default function CurrentProjectPage({
                           <div>
                             <p className="project-members-name">{member.displayName || member.email}</p>
                             <p className="project-members-meta">
-                              {member.email} • роль: {String(member.role || '').toLowerCase()}
+                              {member.email} • роль: {String(member.role || '').toLowerCase()} • права:{' '}
+                              {currentPermissionsRole === 'EDITOR' ? 'редактор' : 'учасник'}
                             </p>
                           </div>
                         </div>
+
+                        {canEditPermissions ? (
+                          <label className="project-members-role-control">
+                            <span>Права</span>
+                            <select
+                              value={currentPermissionsRole}
+                              onChange={(event) => {
+                                void updateMemberRole(member, event.target.value)
+                              }}
+                              disabled={updatingRoleMemberId === member.id}
+                            >
+                              <option value="MEMBER">Учасник</option>
+                              <option value="EDITOR">Редактор</option>
+                            </select>
+                          </label>
+                        ) : null}
 
                         {canRemoveMember ? (
                           <button

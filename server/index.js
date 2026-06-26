@@ -31,6 +31,7 @@ import {
   getMenuEntriesByDate,
   getMenuEntriesByDateInProject,
   getProjectById,
+  getProjectPermissionsRoleForUser,
   getProjectRoleForUser,
   getProjectsForUser,
   getShoppingListItemsByProject,
@@ -50,6 +51,7 @@ import {
   removeFavoriteDishForUserInProject,
   removeProjectMembership,
   setCurrentProjectForUser,
+  updateProjectMemberPermissionsRole,
   updateShoppingItemCheckedInProject,
   updateUserById,
   updateDish,
@@ -147,6 +149,28 @@ function projectOwnerOrAdminRequired(req, res, next) {
   }
 
   return next()
+}
+
+function projectEditorOrOwnerOrAdminRequired(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Потрібна авторизація' })
+  }
+
+  if (req.user.role === 'ADMIN') {
+    return next()
+  }
+
+  const role = getProjectRoleForUser(req.user.id, req.projectId)
+  if (role === 'OWNER') {
+    return next()
+  }
+
+  const permissionsRole = getProjectPermissionsRoleForUser(req.user.id, req.projectId)
+  if (permissionsRole === 'EDITOR') {
+    return next()
+  }
+
+  return res.status(403).json({ message: 'Недостатньо прав для керування стравами і категоріями' })
 }
 
 function addActivityLogSafe(payload) {
@@ -299,6 +323,7 @@ app.get('/api/projects/current', authRequired, projectAccessRequired, (req, res)
   return res.json({
     ...project,
     role: getProjectRoleForUser(req.user.id, req.projectId),
+    permissionsRole: getProjectPermissionsRoleForUser(req.user.id, req.projectId),
     memberCount: countProjectMembers(req.projectId),
   })
 })
@@ -351,6 +376,31 @@ app.delete('/api/projects/current/members/:userId', authRequired, projectAccessR
   }
 
   return res.status(204).send()
+})
+
+app.put('/api/projects/current/members/:userId/role', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
+  const userId = Number(req.params.userId)
+  const permissionsRole = String(req.body.permissionsRole || '').trim().toUpperCase()
+
+  if (!Number.isInteger(userId) || userId < 1) {
+    return res.status(400).json({ message: 'Некоректний userId' })
+  }
+
+  if (permissionsRole !== 'MEMBER' && permissionsRole !== 'EDITOR') {
+    return res.status(400).json({ message: 'permissionsRole має бути MEMBER або EDITOR' })
+  }
+
+  const updated = updateProjectMemberPermissionsRole({
+    userId,
+    projectId: req.projectId,
+    permissionsRole,
+  })
+
+  if (!updated) {
+    return res.status(404).json({ message: 'Учасника не знайдено в поточному проєкті' })
+  }
+
+  return res.json(updated)
 })
 
 app.put('/api/profile', authRequired, async (req, res) => {
@@ -471,7 +521,7 @@ app.get('/api/categories', authRequired, projectAccessRequired, (req, res) => {
   return res.json(getCategoriesByProject(req.projectId, kind))
 })
 
-app.post('/api/categories', authRequired, projectAccessRequired, adminRequired, (req, res) => {
+app.post('/api/categories', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, (req, res) => {
   const name = String(req.body.name || '').trim()
   const kind = String(req.body.kind || '').trim().toUpperCase()
 
@@ -612,7 +662,7 @@ app.delete('/api/favorites/:dishId', authRequired, projectAccessRequired, (req, 
   return res.json({ success: true })
 })
 
-app.post('/api/dishes', authRequired, projectAccessRequired, adminRequired, (req, res) => {
+app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, (req, res) => {
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
   const recipe = String(req.body.recipe || '').trim()
@@ -683,7 +733,7 @@ app.post('/api/dishes', authRequired, projectAccessRequired, adminRequired, (req
   }
 })
 
-app.put('/api/dishes/:id', authRequired, projectAccessRequired, adminRequired, (req, res) => {
+app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, (req, res) => {
   const dishId = Number(req.params.id)
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
@@ -781,7 +831,7 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, adminRequired, (
   }
 })
 
-app.delete('/api/dishes/:id', authRequired, projectAccessRequired, adminRequired, (req, res) => {
+app.delete('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, (req, res) => {
   const dishId = Number(req.params.id)
 
   if (Number.isNaN(dishId)) {

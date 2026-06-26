@@ -77,6 +77,15 @@ function App() {
   const defaultCategoryId =
     menuData.mealCategories[0]?.id ?? menuData.typeCategories[0]?.id ?? null
   const hasProjectAccess = isAdmin || userProjects.length > 0
+  const activeProjectMembership = currentUser?.currentProjectId
+    ? userProjects.find((project) => Number(project.id) === Number(currentUser.currentProjectId))
+    : userProjects[0]
+  const canManageProjectMenu =
+    isAdmin ||
+    activeProjectMembership?.role === 'OWNER' ||
+    activeProjectMembership?.permissionsRole === 'EDITOR'
+  const canViewProjectTab =
+    isAdmin || activeProjectMembership?.role === 'OWNER'
 
   const loadMenuData = async ({ background = false } = {}) => {
     if (!background) {
@@ -250,8 +259,8 @@ function App() {
   }
 
   const handleAddCategory = async (payload) => {
-    if (!isAdmin) {
-      throw new Error('Доступ лише для адміністратора')
+    if (!canManageProjectMenu) {
+      throw new Error('Недостатньо прав для додавання категорій')
     }
 
     const created = await apiRequest('/api/categories', {
@@ -264,8 +273,8 @@ function App() {
   }
 
   const handleAddDish = async (payload) => {
-    if (!isAdmin) {
-      throw new Error('Доступ лише для адміністратора')
+    if (!canManageProjectMenu) {
+      throw new Error('Недостатньо прав для додавання страв')
     }
 
     const created = await apiRequest('/api/dishes', {
@@ -278,8 +287,8 @@ function App() {
   }
 
   const handleUpdateDish = async ({ id, ...payload }) => {
-    if (!isAdmin) {
-      throw new Error('Доступ лише для адміністратора')
+    if (!canManageProjectMenu) {
+      throw new Error('Недостатньо прав для редагування страв')
     }
 
     const updated = await apiRequest(
@@ -296,8 +305,8 @@ function App() {
   }
 
   const handleDeleteDish = async (id) => {
-    if (!isAdmin) {
-      throw new Error('Доступ лише для адміністратора')
+    if (!canManageProjectMenu) {
+      throw new Error('Недостатньо прав для видалення страв')
     }
 
     await apiRequest(
@@ -466,6 +475,17 @@ function App() {
     )
   }
 
+  const handleUpdateMemberRoleInCurrentProject = async (userId, permissionsRole) => {
+    return apiRequest(
+      `/api/projects/current/members/${userId}/role`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ permissionsRole }),
+      },
+      authToken,
+    )
+  }
+
   const handleToggleFavoriteDish = async (dishId, isCurrentlyFavorite) => {
     if (!isAuthenticated) {
       throw new Error('Потрібна авторизація')
@@ -488,7 +508,7 @@ function App() {
   }
 
   const openAddCategoryModal = () => {
-    if (!isAdmin) {
+    if (!canManageProjectMenu) {
       return
     }
 
@@ -497,7 +517,7 @@ function App() {
   }
 
   const openAddDishModal = () => {
-    if (!isAdmin) {
+    if (!canManageProjectMenu) {
       return
     }
 
@@ -548,8 +568,9 @@ function App() {
           mealCategories={menuData.mealCategories}
           typeCategories={menuData.typeCategories}
           currentUser={currentUser}
-          isAdmin={isAdmin}
+          isAdmin={canManageProjectMenu}
           hasProjectAccess={hasProjectAccess}
+          canViewProjectTab={canViewProjectTab}
           showCategoryControls={showCategoryControls}
           onLogout={handleLogout}
           onOpenAddCategory={openAddCategoryModal}
@@ -581,7 +602,7 @@ function App() {
               typeCategories={menuData.typeCategories}
               dishes={menuData.dishes}
               defaultCategoryId={defaultCategoryId}
-              isAdmin={isAdmin}
+              isAdmin={canManageProjectMenu}
               favoriteDishIds={favoriteDishIds}
               onToggleFavoriteDish={handleToggleFavoriteDish}
               onUpdateDish={handleUpdateDish}
@@ -600,7 +621,7 @@ function App() {
               typeCategories={menuData.typeCategories}
               dishes={menuData.dishes}
               defaultCategoryId={defaultCategoryId}
-              isAdmin={isAdmin}
+              isAdmin={canManageProjectMenu}
               favoriteDishIds={favoriteDishIds}
               onToggleFavoriteDish={handleToggleFavoriteDish}
               onUpdateDish={handleUpdateDish}
@@ -633,7 +654,7 @@ function App() {
         <Route
           path="/add-category"
           element={protectedContent(
-            isAdmin ? (
+            canManageProjectMenu ? (
               <AddCategoryPage onAddCategory={handleAddCategory} />
             ) : (
               <Navigate to="/login" replace />
@@ -643,7 +664,7 @@ function App() {
         <Route
           path="/add-dish"
           element={protectedContent(
-            isAdmin ? (
+            canManageProjectMenu ? (
               <AddDishPage
                 mealCategories={menuData.mealCategories}
                 typeCategories={menuData.typeCategories}
@@ -657,12 +678,12 @@ function App() {
         <Route
           path="/edit-dish/:dishId"
           element={protectedContent(
-            isAdmin ? (
+            canManageProjectMenu ? (
               <EditDishPage
                 dishes={menuData.dishes}
                 mealCategories={menuData.mealCategories}
                 typeCategories={menuData.typeCategories}
-                isAdmin={isAdmin}
+                isAdmin={canManageProjectMenu}
                 onUpdateDish={handleUpdateDish}
               />
             ) : (
@@ -685,13 +706,18 @@ function App() {
         <Route
           path="/project"
           element={protectedContent(
-            <CurrentProjectPage
-              currentUser={currentUser}
-              onLoadCurrentProject={handleLoadCurrentProject}
-              onInviteToCurrentProject={handleInviteToCurrentProject}
-              onLoadCurrentProjectMembers={handleLoadCurrentProjectMembers}
-              onRemoveMemberFromCurrentProject={handleRemoveMemberFromCurrentProject}
-            />,
+            canViewProjectTab ? (
+              <CurrentProjectPage
+                currentUser={currentUser}
+                onLoadCurrentProject={handleLoadCurrentProject}
+                onInviteToCurrentProject={handleInviteToCurrentProject}
+                onLoadCurrentProjectMembers={handleLoadCurrentProjectMembers}
+                onRemoveMemberFromCurrentProject={handleRemoveMemberFromCurrentProject}
+                onUpdateMemberRoleInCurrentProject={handleUpdateMemberRoleInCurrentProject}
+              />
+            ) : (
+              <Navigate to="/" replace />
+            ),
           )}
         />
         <Route
@@ -724,7 +750,7 @@ function App() {
         />
       </Routes>
 
-      {isAuthenticated && isAdmin && isAddCategoryModalOpen ? (
+      {isAuthenticated && canManageProjectMenu && isAddCategoryModalOpen ? (
         <div className="dish-modal-overlay" role="presentation" onClick={closeAddModals}>
           <section
             className="dish-modal admin-modal"
@@ -751,7 +777,7 @@ function App() {
         </div>
       ) : null}
 
-      {isAuthenticated && isAdmin && isAddDishModalOpen ? (
+      {isAuthenticated && canManageProjectMenu && isAddDishModalOpen ? (
         <div className="dish-modal-overlay" role="presentation" onClick={closeAddModals}>
           <section
             className="dish-modal admin-modal"
