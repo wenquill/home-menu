@@ -122,6 +122,7 @@ export default function CategoryPage({
   onScheduleDishToMenu,
 }) {
   const { categoryId } = useParams()
+  const isAllDishesView = categoryId === 'all'
   const selectedCategoryId = Number(categoryId)
   const [selectedDish, setSelectedDish] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -154,17 +155,23 @@ export default function CategoryPage({
 
   const category = allCategories.find((item) => item.id === selectedCategoryId)
 
-  if (!category && defaultCategoryId) {
+  if (!isAllDishesView && !category && defaultCategoryId) {
     return <Navigate to={`/category/${defaultCategoryId}`} replace />
   }
 
-  const filteredDishes = category
+  const filteredDishes = isAllDishesView
+    ? dishes
+    : category
     ? dishes.filter(
         (dish) =>
           dish.mealCategoryId === selectedCategoryId ||
           dish.typeCategoryId === selectedCategoryId,
       )
     : []
+
+  const categoryLabel = isAllDishesView ? 'усі страви' : category?.name || 'меню'
+  const dishListAriaLabel = `Страви: ${categoryLabel}`
+  const dishKeyPrefix = isAllDishesView ? 'all' : String(selectedCategoryId)
 
   const isEmptyCategory = filteredDishes.length === 0
 
@@ -440,17 +447,17 @@ export default function CategoryPage({
 
   return (
     <main className="category-page">
-      <h1 className="category-title">{category?.name || 'Меню'}</h1>
+      <h1 className="category-title">{categoryLabel}</h1>
 
       {isEmptyCategory ? (
-        <section className="empty-category-state" aria-label={`Страви: ${category?.name || 'Меню'}`}>
+        <section className="empty-category-state" aria-label={dishListAriaLabel}>
           <p>Тут поки порожньо. Додайте перші страви у цю категорію.</p>
         </section>
       ) : (
-        <section className="dish-grid" aria-label={`Страви: ${category?.name || 'Меню'}`}>
+        <section className="dish-grid" aria-label={dishListAriaLabel}>
           {filteredDishes.map((dish) => (
             <DishCard
-              key={`${selectedCategoryId}-${dish.id}`}
+              key={`${dishKeyPrefix}-${dish.id}`}
               id={dish.id}
               title={dish.title}
               description={dish.description}

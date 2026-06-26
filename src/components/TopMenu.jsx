@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
 const linkClass = ({ isActive }) =>
@@ -74,6 +74,7 @@ export default function TopMenu({
   onLoadActivityLogs,
   onLoadUnreadActivityCount,
 }) {
+  const location = useLocation()
   const [isActivityOpen, setIsActivityOpen] = useState(false)
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [activityLogs, setActivityLogs] = useState([])
@@ -191,6 +192,9 @@ export default function TopMenu({
     }))
   }
 
+  const isDishesPageActive =
+    location.pathname === '/' || location.pathname.startsWith('/category/')
+
   return (
     <>
       <header className="top-menu top-menu--strip">
@@ -198,7 +202,10 @@ export default function TopMenu({
           {currentUser ? (
             <>
               <div className="menu-strip-center">
-                <NavLink to="/" className={linkClass}>
+                <NavLink
+                  to="/"
+                  className={isDishesPageActive ? 'menu-link menu-link--active' : 'menu-link'}
+                >
                   Страви
                 </NavLink>
                 <NavLink to="/menu" className={linkClass}>
@@ -255,6 +262,12 @@ export default function TopMenu({
 
       {showCategoryControls ? (
         <section className="top-menu top-menu--categories">
+          <div className="menu-actions menu-actions--categories">
+            <NavLink to="/category/all" className={linkClass}>
+              усі страви
+            </NavLink>
+          </div>
+
           {isAdmin ? (
             <div className="menu-actions menu-actions--categories">
               <button type="button" className="menu-link menu-link--button" onClick={onOpenAddCategory}>

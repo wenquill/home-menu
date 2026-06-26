@@ -94,10 +94,20 @@ body {
 .top-menu--strip .menu-link--button {
   background: transparent;
   border-color: transparent;
+  color: var(--muted);
 }
 
-.top-menu--strip .menu-link--active,
 .top-menu--strip .menu-link:hover {
+  color: var(--text);
+}
+
+.top-menu--strip .menu-link--active {
+  background: transparent;
+  border-color: transparent;
+  color: #d1a900;
+}
+
+.top-menu--strip .menu-link--button:hover {
   background: transparent;
   border-color: transparent;
 }
@@ -174,6 +184,11 @@ body {
 .menu-link--profile:hover {
   background: transparent;
   border-color: transparent;
+}
+
+.menu-link--profile.menu-link--active .menu-avatar {
+  border-color: #f3c400;
+  box-shadow: 0 0 0 2px rgba(243, 196, 0, 0.28);
 }
 
 .menu-link--profile:active {
