@@ -1,5 +1,18 @@
 import { useEffect, useState } from 'react'
 
+const defaultAvatarUrls = [
+  '/default-avatars/avatar-1.svg',
+  '/default-avatars/avatar-2.svg',
+  '/default-avatars/avatar-3.svg',
+  '/default-avatars/avatar-4.svg',
+  '/default-avatars/avatar-5.svg',
+  '/default-avatars/avatar-6.svg',
+  '/default-avatars/avatar-7.svg',
+  '/default-avatars/avatar-8.svg',
+  '/default-avatars/avatar-9.svg',
+  '/default-avatars/avatar-10.svg',
+]
+
 export default function ProfilePage({ currentUser, onUpdateProfile }) {
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -86,10 +99,28 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
               alt="Аватар користувача"
               className="profile-avatar"
             />
+            <div className="default-avatar-grid" aria-label="Оберіть дефолтний аватар">
+              {defaultAvatarUrls.map((avatarUrl) => (
+                <button
+                  key={avatarUrl}
+                  type="button"
+                  className={
+                    avatarDataUrl === avatarUrl
+                      ? 'default-avatar-option default-avatar-option--active'
+                      : 'default-avatar-option'
+                  }
+                  onClick={() => setAvatarDataUrl(avatarUrl)}
+                  aria-label="Обрати аватар"
+                >
+                  <img src={avatarUrl} alt="Варіант аватара" />
+                </button>
+              ))}
+            </div>
             <label className="avatar-upload-label" htmlFor="avatar-upload">
               Завантажити фотографію
             </label>
             <input
+              className="avatar-upload-input"
               id="avatar-upload"
               type="file"
               accept="image/*"

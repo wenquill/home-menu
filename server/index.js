@@ -122,6 +122,8 @@ app.put('/api/profile', authRequired, async (req, res) => {
   const currentPassword = String(req.body.currentPassword || '')
   const newPassword = String(req.body.newPassword || '')
   const avatarDataUrl = String(req.body.avatarDataUrl || '').trim()
+  const isPresetAvatar = /^\/default-avatars\/avatar-([1-9]|10)\.svg$/.test(avatarDataUrl)
+  const isUploadedImage = avatarDataUrl.startsWith('data:image/')
 
   if (!email.includes('@')) {
     return res.status(400).json({ message: 'Вкажіть коректний логін (email)' })
@@ -157,11 +159,11 @@ app.put('/api/profile', authRequired, async (req, res) => {
     return res.status(409).json({ message: 'Користувач з таким логіном вже існує' })
   }
 
-  if (avatarDataUrl && !avatarDataUrl.startsWith('data:image/')) {
-    return res.status(400).json({ message: 'Аватар має бути зображенням' })
+  if (avatarDataUrl && !isUploadedImage && !isPresetAvatar) {
+    return res.status(400).json({ message: 'Аватар має бути зображенням або дефолтним аватаром' })
   }
 
-  if (avatarDataUrl.length > 2_000_000) {
+  if (isUploadedImage && avatarDataUrl.length > 2_000_000) {
     return res.status(400).json({ message: 'Аватар занадто великий. Спробуйте менше зображення' })
   }
 

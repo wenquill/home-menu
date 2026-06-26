@@ -10,6 +10,24 @@ const dbPath = path.join(__dirname, 'data.sqlite')
 const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
 
+const defaultAvatarUrls = [
+  '/default-avatars/avatar-1.svg',
+  '/default-avatars/avatar-2.svg',
+  '/default-avatars/avatar-3.svg',
+  '/default-avatars/avatar-4.svg',
+  '/default-avatars/avatar-5.svg',
+  '/default-avatars/avatar-6.svg',
+  '/default-avatars/avatar-7.svg',
+  '/default-avatars/avatar-8.svg',
+  '/default-avatars/avatar-9.svg',
+  '/default-avatars/avatar-10.svg',
+]
+
+function pickRandomDefaultAvatar() {
+  const randomIndex = Math.floor(Math.random() * defaultAvatarUrls.length)
+  return defaultAvatarUrls[randomIndex]
+}
+
 function seedCategories() {
   const mealCategories = ['Сніданки', 'Обіди', 'Вечері', 'Перекуси', 'Інше']
   const typeCategories = ['Закуски', 'Салати', 'Гарнір', 'Основне', 'Десерти']
@@ -311,9 +329,11 @@ export function getUserById(id) {
 }
 
 export function createUser({ email, passwordHash, role = 'USER' }) {
+  const avatarUrl = pickRandomDefaultAvatar()
+
   const result = db
-    .prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)')
-    .run(email, passwordHash, role)
+    .prepare('INSERT INTO users (email, password_hash, role, avatar_url) VALUES (?, ?, ?, ?)')
+    .run(email, passwordHash, role, avatarUrl)
 
   return getUserById(result.lastInsertRowid)
 }

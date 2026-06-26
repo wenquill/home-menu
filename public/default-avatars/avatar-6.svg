@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Girl avatar 6">
+  <rect width="120" height="120" rx="60" fill="#ffc2d9"/>
+  <path d="M30 52c0-20 13-33 30-33s30 13 30 33v18H30V52z" fill="#9333a0"/>
+  <circle cx="60" cy="52" r="24" fill="#f3c6a8"/>
+  <path d="M40 45c3-9 11-14 20-14s17 5 20 14" fill="#9333a0"/>
+  <circle cx="51" cy="52" r="2.8" fill="#202020"/>
+  <circle cx="69" cy="52" r="2.8" fill="#202020"/>
+  <path d="M48 62c3 4 8 6 12 6s9-2 12-6" stroke="#202020" stroke-width="3" stroke-linecap="round" fill="none"/>
+  <circle cx="44" cy="58" r="3" fill="#ef8ca8" opacity="0.6"/>
+  <circle cx="76" cy="58" r="3" fill="#ef8ca8" opacity="0.6"/>
+  <path d="M60 18l4 8h9l-7 5 3 9-9-6-9 6 3-9-7-5h9z" fill="#ff78b4"/>
+  <path d="M30 104c6-18 19-30 30-30s24 12 30 30" fill="#f3c6a8"/>
+</svg>

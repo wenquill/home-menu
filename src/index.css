@@ -12,6 +12,9 @@
   --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   --success: #0b7a3a;
   --error: #b91c1c;
+  --btn-bg: #ffd84d;
+  --btn-border: #f3c400;
+  --btn-text: #1f1f1f;
 }
 
 * {
@@ -110,9 +113,27 @@ body {
   gap: 8px;
 }
 
+.menu-actions a[href='/profile'] {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-color: transparent;
+}
+
+.menu-actions a[href='/profile'].menu-link--active,
+.menu-actions a[href='/profile']:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
 .menu-avatar {
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   object-fit: cover;
   border: 1px solid rgba(0, 0, 0, 0.12);
@@ -249,9 +270,9 @@ body {
 }
 
 .admin-form button {
-  border: 1px solid #121212;
-  background: #121212;
-  color: #ffffff;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
   padding: 10px 12px;
   font-weight: 700;
 }
@@ -295,14 +316,74 @@ body {
   border: 2px solid var(--line);
 }
 
-.avatar-upload-label {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-#avatar-upload {
+.default-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
   width: 100%;
   max-width: 320px;
+}
+
+.admin-form .default-avatar-option {
+  width: 50px;
+  min-width: 50px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.default-avatar-option img {
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.admin-form .default-avatar-option--active {
+  border-color: #e75480;
+  box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.22);
+  transform: scale(1.04);
+}
+
+.admin-form .default-avatar-option:hover {
+  border-color: #e75480;
+}
+
+.avatar-upload-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.avatar-upload-label:active {
+  transform: scale(0.98);
+}
+
+.avatar-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  white-space: nowrap;
+  clip-path: inset(50%);
+  clip: rect(0 0 0 0);
+  overflow: hidden;
 }
 
 @media (min-width: 640px) {
