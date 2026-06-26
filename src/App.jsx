@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import TopMenu from './components/TopMenu'
+import AddCategoryPage from './pages/AddCategoryPage'
+import AddDishPage from './pages/AddDishPage'
 import CategoryPage from './pages/CategoryPage'
 
 const emptyMenu = {
@@ -87,7 +89,7 @@ function App() {
   const emptyStateElement = (
     <main className="category-page">
       <h1>Категорії ще не створені</h1>
-      <p className="state-message">Додайте перші категорії внизу сторінки.</p>
+      <p className="state-message">Додайте перші категорії на сторінці додавання.</p>
     </main>
   )
 
@@ -120,7 +122,19 @@ function App() {
               typeCategories={menuData.typeCategories}
               dishes={menuData.dishes}
               defaultCategoryId={defaultCategoryId}
-              onAddCategory={handleAddCategory}
+            />
+          }
+        />
+        <Route
+          path="/add-category"
+          element={<AddCategoryPage onAddCategory={handleAddCategory} />}
+        />
+        <Route
+          path="/add-dish"
+          element={
+            <AddDishPage
+              mealCategories={menuData.mealCategories}
+              typeCategories={menuData.typeCategories}
               onAddDish={handleAddDish}
             />
           }

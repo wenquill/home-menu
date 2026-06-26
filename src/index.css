@@ -50,6 +50,13 @@ body {
   backdrop-filter: blur(6px);
 }
 
+.menu-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .menu-group {
   margin-bottom: 10px;
 }
@@ -164,6 +171,12 @@ body {
 .admin-form h3 {
   margin: 0;
   font-size: 16px;
+}
+
+.admin-form label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .admin-form input,
