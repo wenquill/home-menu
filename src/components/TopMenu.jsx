@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 
 const linkClass = ({ isActive }) =>
   isActive ? 'menu-link menu-link--active' : 'menu-link'
@@ -27,6 +28,40 @@ function MenuGroup({ title, categories }) {
   )
 }
 
+function toDateKey(value) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDayLabel(dateKey) {
+  const todayKey = toDateKey(new Date())
+  const date = new Date(`${dateKey}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) {
+    return dateKey
+  }
+
+  const formatted = new Intl.DateTimeFormat('uk-UA', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+
+  if (dateKey === todayKey) {
+    return `сьогодні, ${formatted}`
+  }
+
+  return formatted
+}
+
 export default function TopMenu({
   mealCategories,
   typeCategories,
@@ -36,7 +71,124 @@ export default function TopMenu({
   onLogout,
   onOpenAddCategory,
   onOpenAddDish,
+  onLoadActivityLogs,
+  onLoadUnreadActivityCount,
 }) {
+  const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [activityLogs, setActivityLogs] = useState([])
+  const [isActivityLoading, setIsActivityLoading] = useState(false)
+  const [activityError, setActivityError] = useState('')
+  const [expandedDays, setExpandedDays] = useState({})
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const activityLogGroups = useMemo(() => {
+    const groupsByDate = new Map()
+
+    activityLogs.forEach((log) => {
+      const dateKey = toDateKey(log.createdAt)
+      const normalizedDateKey = dateKey || 'unknown-date'
+      const existing = groupsByDate.get(normalizedDateKey) || []
+      existing.push(log)
+      groupsByDate.set(normalizedDateKey, existing)
+    })
+
+    const toSortableTime = (dateKey) => {
+      if (dateKey === 'unknown-date') {
+        return Number.NEGATIVE_INFINITY
+      }
+
+      const date = new Date(`${dateKey}T00:00:00`)
+      return Number.isNaN(date.getTime()) ? Number.NEGATIVE_INFINITY : date.getTime()
+    }
+
+    return Array.from(groupsByDate.entries())
+      .sort((a, b) => toSortableTime(b[0]) - toSortableTime(a[0]))
+      .map(([dateKey, logs]) => ({ dateKey, logs }))
+  }, [activityLogs])
+
+  useEffect(() => {
+    if (!isActivityOpen) {
+      return undefined
+    }
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsActivityOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isActivityOpen])
+
+  useEffect(() => {
+    if (!currentUser || !onLoadUnreadActivityCount) {
+      setUnreadCount(0)
+      return
+    }
+
+    let isActive = true
+
+    const loadUnreadCount = async () => {
+      try {
+        const data = await onLoadUnreadActivityCount()
+        if (isActive) {
+          setUnreadCount(Number(data?.count || 0))
+        }
+      } catch (_error) {
+        if (isActive) {
+          setUnreadCount(0)
+        }
+      }
+    }
+
+    loadUnreadCount()
+
+    return () => {
+      isActive = false
+    }
+  }, [currentUser, onLoadUnreadActivityCount])
+
+  const openActivity = async () => {
+    if (!onLoadActivityLogs) {
+      return
+    }
+
+    setIsActivityOpen(true)
+    setActivityError('')
+    setIsActivityLoading(true)
+
+    try {
+      const logs = await onLoadActivityLogs(120, { markAsRead: true })
+      const normalizedLogs = Array.isArray(logs) ? logs : []
+      setActivityLogs(normalizedLogs)
+      setUnreadCount(0)
+
+      const todayKey = toDateKey(new Date())
+      const nextExpandedDays = {}
+
+      normalizedLogs.forEach((log) => {
+        const dateKey = toDateKey(log.createdAt) || 'unknown-date'
+        if (nextExpandedDays[dateKey] === undefined) {
+          nextExpandedDays[dateKey] = dateKey === todayKey
+        }
+      })
+
+      setExpandedDays(nextExpandedDays)
+    } catch (error) {
+      setActivityError(error.message)
+    } finally {
+      setIsActivityLoading(false)
+    }
+  }
+
+  const toggleDay = (dateKey) => {
+    setExpandedDays((prev) => ({
+      ...prev,
+      [dateKey]: !prev[dateKey],
+    }))
+  }
+
   return (
     <>
       <header className="top-menu top-menu--strip">
@@ -54,6 +206,25 @@ export default function TopMenu({
                   вийти
                 </button>
               </div>
+
+              <button
+                type="button"
+                className="menu-link menu-link--icon"
+                aria-label="Відкрити логи активності"
+                title="Логи активності"
+                onClick={() => {
+                  void openActivity()
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5L3 18v1h18v-1l-2-2zm-2 .17.59.58H6.41l.59-.58V11a5 5 0 0 1 10 0v5.17z" />
+                </svg>
+                {unreadCount > 0 ? (
+                  <span className="menu-link-notification-dot" aria-label={`Непрочитаних логів: ${unreadCount}`}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                ) : null}
+              </button>
 
               <NavLink to="/profile" className={profileLinkClass}>
                 <img
@@ -92,6 +263,84 @@ export default function TopMenu({
           <MenuGroup title="За часом дня" categories={mealCategories} />
           <MenuGroup title="За видом страв" categories={typeCategories} />
         </section>
+      ) : null}
+
+      {isActivityOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={() => setIsActivityOpen(false)}>
+          <section
+            className="dish-modal activity-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Логи активності"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="dish-modal-close"
+              aria-label="Закрити"
+              onClick={() => setIsActivityOpen(false)}
+            >
+              ×
+            </button>
+            <h2>логи активності</h2>
+
+            {isActivityLoading ? <p className="state-message">завантаження логів...</p> : null}
+            {activityError ? <p className="state-message state-message--error">{activityError}</p> : null}
+
+            {!isActivityLoading && !activityError && activityLogs.length === 0 ? (
+              <p className="state-message">Ще немає записів активності.</p>
+            ) : null}
+
+            {!isActivityLoading && activityLogGroups.length > 0 ? (
+              <ul className="activity-day-list" aria-label="Список логів активності">
+                {activityLogGroups.map((group) => {
+                  const isExpanded = Boolean(expandedDays[group.dateKey])
+
+                  return (
+                    <li key={group.dateKey} className="activity-day-item">
+                      <button
+                        type="button"
+                        className="activity-day-toggle"
+                        onClick={() => toggleDay(group.dateKey)}
+                        aria-expanded={isExpanded}
+                      >
+                        <span>{formatDayLabel(group.dateKey)}</span>
+                        <span className="activity-day-toggle-meta">
+                          {group.logs.length}
+                          {isExpanded ? ' ▲' : ' ▼'}
+                        </span>
+                      </button>
+
+                      {isExpanded ? (
+                        <ul className="activity-log-list" aria-label={`Логи за ${group.dateKey}`}>
+                          {group.logs.map((log) => (
+                            <li key={log.id} className="activity-log-item">
+                              <p>{log.message}</p>
+                              <div className="activity-log-item-meta">
+                                <time dateTime={log.createdAt}>
+                                  {new Intl.DateTimeFormat('uk-UA', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                  }).format(new Date(log.createdAt))}
+                                </time>
+                                <span
+                                  className={log.isRead ? 'activity-log-status activity-log-status--read' : 'activity-log-status activity-log-status--unread'}
+                                >
+                                  {log.isRead ? 'прочитано' : 'непрочитано'}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+          </section>
+        </div>
       ) : null}
     </>
   )

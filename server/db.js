@@ -113,12 +113,62 @@ function normalizeMenuDate(menuDate) {
   return value
 }
 
+function normalizeActivityDetails(details) {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
+    return {}
+  }
+
+  return details
+}
+
 function getMenuPlannedDishIdsByDate(menuDate) {
   const normalizedDate = normalizeMenuDate(menuDate)
 
   return db
     .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE menu_date = ? ORDER BY id DESC')
     .all(normalizedDate)
+}
+
+function parseActivityLogDetails(detailsJson) {
+  if (!detailsJson) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(detailsJson)
+  } catch (_error) {
+    return {}
+  }
+}
+
+function getActivityLogRowsForUser(userId, limit = 50) {
+  return db
+    .prepare(
+      `SELECT
+        l.id,
+        l.actor_user_id AS actorUserId,
+        l.actor_email AS actorEmail,
+        l.action,
+        l.message,
+        l.details_json AS detailsJson,
+        l.created_at AS createdAt,
+        CASE
+          WHEN l.actor_user_id = ? OR r.activity_log_id IS NOT NULL THEN 1
+          ELSE 0
+        END AS isRead
+       FROM activity_logs l
+       LEFT JOIN activity_log_reads r
+         ON r.activity_log_id = l.id
+        AND r.user_id = ?
+       ORDER BY l.id DESC
+       LIMIT ?`,
+    )
+    .all(userId, userId, limit)
+    .map((row) => ({
+      ...row,
+      details: parseActivityLogDetails(row.detailsJson),
+      isRead: Boolean(row.isRead),
+    }))
 }
 
 function seedCategories() {
@@ -259,11 +309,33 @@ export function initializeDatabase() {
       UNIQUE(dish_id, menu_date)
     );
 
+    CREATE TABLE IF NOT EXISTS activity_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_user_id INTEGER NOT NULL,
+      actor_email TEXT NOT NULL,
+      action TEXT NOT NULL,
+      message TEXT NOT NULL,
+      details_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS activity_log_reads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      activity_log_id INTEGER NOT NULL,
+      read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (activity_log_id) REFERENCES activity_logs(id) ON DELETE CASCADE,
+      UNIQUE(user_id, activity_log_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_categories_kind ON categories(kind);
     CREATE INDEX IF NOT EXISTS idx_dishes_meal_category ON dishes(meal_category_id);
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
     CREATE INDEX IF NOT EXISTS idx_dish_components_dish ON dish_components(dish_id);
     CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
+    CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -295,6 +367,42 @@ export function initializeDatabase() {
         UNIQUE(dish_id, menu_date)
       );
       CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
+    `)
+  }
+
+  const activityLogColumns = db.prepare("PRAGMA table_info('activity_logs')").all()
+  const hasActivityLogTable = activityLogColumns.length > 0
+
+  if (!hasActivityLogTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        actor_user_id INTEGER NOT NULL,
+        actor_email TEXT NOT NULL,
+        action TEXT NOT NULL,
+        message TEXT NOT NULL,
+        details_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
+    `)
+  }
+
+  const activityLogReadColumns = db.prepare("PRAGMA table_info('activity_log_reads')").all()
+  const hasActivityLogReadTable = activityLogReadColumns.length > 0
+
+  if (!hasActivityLogReadTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS activity_log_reads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        activity_log_id INTEGER NOT NULL,
+        read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (activity_log_id) REFERENCES activity_logs(id) ON DELETE CASCADE,
+        UNIQUE(user_id, activity_log_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     `)
   }
 
@@ -413,6 +521,36 @@ export function getDishById(id) {
 
   const [dishWithComponents] = attachDishComponents([dish])
   return dishWithComponents
+}
+
+export function getMenuEntryById(id) {
+  const menuEntry = db
+    .prepare(
+      `SELECT
+        me.id AS menuEntryId,
+        me.menu_date AS menuDate,
+        d.id,
+        d.title,
+        d.description,
+        d.recipe,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM menu_entries me
+       JOIN dishes d ON d.id = me.dish_id
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE me.id = ?`,
+    )
+    .get(id)
+
+  if (!menuEntry) {
+    return null
+  }
+
+  const [menuEntryWithComponents] = attachDishComponents([menuEntry])
+  return menuEntryWithComponents
 }
 
 export function createDish({ title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
@@ -551,4 +689,76 @@ export function updateUserById({ id, email, passwordHash, avatarUrl }) {
   ).run(email, passwordHash, avatarUrl, id)
 
   return getUserById(id)
+}
+
+export function createActivityLog({ actorUserId, actorEmail, action, message, details = {} }) {
+  const normalizedDetails = normalizeActivityDetails(details)
+
+  const result = db
+    .prepare(
+      'INSERT INTO activity_logs (actor_user_id, actor_email, action, message, details_json) VALUES (?, ?, ?, ?, ?)',
+    )
+    .run(actorUserId, actorEmail, action, message, JSON.stringify(normalizedDetails))
+
+  return db
+    .prepare(
+      `SELECT
+        id,
+        actor_user_id AS actorUserId,
+        actor_email AS actorEmail,
+        action,
+        message,
+        details_json AS detailsJson,
+        created_at AS createdAt
+       FROM activity_logs
+       WHERE id = ?`,
+    )
+    .get(result.lastInsertRowid)
+}
+
+export function getRecentActivityLogs(limit = 50) {
+  return getActivityLogRowsForUser(0, limit)
+}
+
+export function getRecentActivityLogsForUser(userId, limit = 50) {
+  return getActivityLogRowsForUser(userId, limit)
+}
+
+export function markActivityLogsAsReadForUser(userId, logIds = []) {
+  const normalizedIds = logIds
+    .map((id) => Number(id))
+    .filter((id) => Number.isInteger(id) && id > 0)
+
+  if (!normalizedIds.length) {
+    return 0
+  }
+
+  const placeholders = normalizedIds.map(() => '?').join(', ')
+  const result = db
+    .prepare(
+      `INSERT OR IGNORE INTO activity_log_reads (user_id, activity_log_id)
+       SELECT ?, l.id
+       FROM activity_logs l
+       WHERE l.id IN (${placeholders})
+         AND l.actor_user_id != ?`,
+    )
+    .run(userId, ...normalizedIds, userId)
+
+  return result.changes
+}
+
+export function getUnreadActivityLogsCountForUser(userId) {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM activity_logs l
+       LEFT JOIN activity_log_reads r
+         ON r.activity_log_id = l.id
+        AND r.user_id = ?
+       WHERE l.actor_user_id != ?
+         AND r.activity_log_id IS NULL`,
+    )
+    .get(userId, userId)
+
+  return Number(row?.count || 0)
 }

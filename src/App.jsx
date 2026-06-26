@@ -278,6 +278,18 @@ function App() {
     )
   }
 
+  const handleLoadActivityLogs = async (limit = 80, { markAsRead = true } = {}) => {
+    return apiRequest(
+      `/api/activity-logs?limit=${encodeURIComponent(limit)}&markAsRead=${markAsRead ? 'true' : 'false'}`,
+      {},
+      authToken,
+    )
+  }
+
+  const handleLoadUnreadActivityCount = async () => {
+    return apiRequest('/api/activity-logs/unread-count', {}, authToken)
+  }
+
   const openAddCategoryModal = () => {
     if (!isAdmin) {
       return
@@ -332,6 +344,8 @@ function App() {
           onLogout={handleLogout}
           onOpenAddCategory={openAddCategoryModal}
           onOpenAddDish={openAddDishModal}
+          onLoadActivityLogs={handleLoadActivityLogs}
+          onLoadUnreadActivityCount={handleLoadUnreadActivityCount}
         />
       ) : null}
 

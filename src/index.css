@@ -180,6 +180,47 @@ body {
   transform: scale(0.97);
 }
 
+.menu-link--icon {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin-left: auto;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-link--icon + .menu-link--profile {
+  margin-left: 8px;
+}
+
+.menu-link--icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.menu-link-notification-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  border: 2px solid #fff;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .menu-avatar {
   width: 30px;
   height: 30px;
@@ -414,6 +455,99 @@ body {
 .admin-modal {
   width: min(620px, 100%);
   padding-top: 28px;
+}
+
+.activity-modal {
+  width: min(700px, 100%);
+  max-height: min(75svh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-day-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-day-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.activity-day-toggle {
+  width: 100%;
+  border: 0;
+  background: #fff9db;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font: inherit;
+  font-weight: 700;
+  color: #222;
+  cursor: pointer;
+}
+
+.activity-day-toggle-meta {
+  color: #6a6a6a;
+  font-size: 12px;
+}
+
+.activity-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-log-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.activity-log-item p {
+  margin: 0;
+  color: #212121;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.activity-log-item time {
+  color: #777;
+  font-size: 12px;
+}
+
+.activity-log-item-meta {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.activity-log-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: lowercase;
+}
+
+.activity-log-status--read {
+  color: #4b5563;
+}
+
+.activity-log-status--unread {
+  color: #b91c1c;
 }
 
 .admin-modal-content {

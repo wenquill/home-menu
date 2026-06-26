@@ -4,15 +4,20 @@ import express from 'express'
 import jwt from 'jsonwebtoken'
 import {
   createUser,
+  createActivityLog,
   createCategory,
   createDish,
   createMenuEntry,
   deleteDish,
   deleteMenuEntryById,
   getDishById,
+  getMenuEntryById,
   getCategories,
   getCategoryById,
   getMenuEntriesByDate,
+  getRecentActivityLogsForUser,
+  getUnreadActivityLogsCountForUser,
+  markActivityLogsAsReadForUser,
   getDishes,
   getUserByEmail,
   getUserById,
@@ -66,6 +71,30 @@ function adminRequired(req, res, next) {
   }
 
   return next()
+}
+
+function addActivityLogSafe(payload) {
+  try {
+    createActivityLog(payload)
+  } catch (_error) {
+    // Activity logs must not break the main user operation.
+  }
+}
+
+function getAddedComponents(beforeComponents = [], afterComponents = []) {
+  const beforeSet = new Set(beforeComponents.map((item) => String(item).trim().toLowerCase()).filter(Boolean))
+  return afterComponents
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .filter((item) => !beforeSet.has(item.toLowerCase()))
+}
+
+function getRemovedComponents(beforeComponents = [], afterComponents = []) {
+  const afterSet = new Set(afterComponents.map((item) => String(item).trim().toLowerCase()).filter(Boolean))
+  return beforeComponents
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .filter((item) => !afterSet.has(item.toLowerCase()))
 }
 
 app.get('/api/health', (_req, res) => {
@@ -197,6 +226,28 @@ app.get('/api/menu', (_req, res) => {
   })
 })
 
+app.get('/api/activity-logs', authRequired, (req, res) => {
+  const limit = req.query.limit ? Number(req.query.limit) : 60
+  const markAsRead = req.query.markAsRead !== 'false'
+
+  if (Number.isNaN(limit) || limit < 1 || limit > 300) {
+    return res.status(400).json({ message: 'limit має бути числом від 1 до 300' })
+  }
+
+  const logs = getRecentActivityLogsForUser(req.user.id, limit)
+
+  if (markAsRead && logs.length > 0) {
+    markActivityLogsAsReadForUser(req.user.id, logs.map((log) => log.id))
+    return res.json(logs.map((log) => ({ ...log, isRead: true })))
+  }
+
+  return res.json(logs)
+})
+
+app.get('/api/activity-logs/unread-count', authRequired, (req, res) => {
+  return res.json({ count: getUnreadActivityLogsCountForUser(req.user.id) })
+})
+
 app.get('/api/categories', (req, res) => {
   const kind = req.query.kind
 
@@ -221,6 +272,19 @@ app.post('/api/categories', authRequired, adminRequired, (req, res) => {
 
   try {
     const category = createCategory({ name, kind })
+
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'CATEGORY_CREATED',
+      message: `${req.user.email} створив(ла) нову категорію \"${category.name}\"`,
+      details: {
+        categoryId: category.id,
+        categoryName: category.name,
+        categoryKind: category.kind,
+      },
+    })
+
     return res.status(201).json(category)
   } catch (error) {
     if (String(error.message).includes('UNIQUE constraint failed')) {
@@ -293,6 +357,32 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
       components,
     })
 
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'DISH_CREATED',
+      message: `${req.user.email} створив(ла) нову страву \"${dish.title}\"`,
+      details: {
+        dishId: dish.id,
+        dishTitle: dish.title,
+      },
+    })
+
+    const createdComponents = (dish.components || []).map((item) => String(item).trim()).filter(Boolean)
+    createdComponents.forEach((componentName) => {
+      addActivityLogSafe({
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'DISH_COMPONENT_ADDED',
+        message: `${req.user.email} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
+        details: {
+          dishId: dish.id,
+          dishTitle: dish.title,
+          componentName,
+        },
+      })
+    })
+
     return res.status(201).json(dish)
   } catch (_error) {
     return res.status(500).json({ message: 'Не вдалося створити страву' })
@@ -347,6 +437,48 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
       components,
     })
 
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'DISH_UPDATED',
+      message: `${req.user.email} редагував(ла) страву \"${dish.title}\"`,
+      details: {
+        dishId: dish.id,
+        dishTitle: dish.title,
+      },
+    })
+
+    const addedComponents = getAddedComponents(existingDish.components || [], dish.components || [])
+    const removedComponents = getRemovedComponents(existingDish.components || [], dish.components || [])
+
+    addedComponents.forEach((componentName) => {
+      addActivityLogSafe({
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'DISH_COMPONENT_ADDED',
+        message: `${req.user.email} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
+        details: {
+          dishId: dish.id,
+          dishTitle: dish.title,
+          componentName,
+        },
+      })
+    })
+
+    removedComponents.forEach((componentName) => {
+      addActivityLogSafe({
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'DISH_COMPONENT_REMOVED',
+        message: `${req.user.email} видалив(ла) компонент \"${componentName}\" зі страви \"${dish.title}\"`,
+        details: {
+          dishId: dish.id,
+          dishTitle: dish.title,
+          componentName,
+        },
+      })
+    })
+
     return res.json(dish)
   } catch (_error) {
     return res.status(500).json({ message: 'Не вдалося оновити страву' })
@@ -367,6 +499,18 @@ app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
 
   try {
     deleteDish(dishId)
+
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'DISH_DELETED',
+      message: `${req.user.email} видалив(ла) страву \"${existingDish.title}\"`,
+      details: {
+        dishId,
+        dishTitle: existingDish.title,
+      },
+    })
+
     return res.json({ success: true })
   } catch (_error) {
     return res.status(500).json({ message: 'Не вдалося видалити страву' })
@@ -401,6 +545,23 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
 
   try {
     const menuEntry = createMenuEntry({ dishId, menuDate })
+
+    const dish = getDishById(dishId)
+    if (dish) {
+      addActivityLogSafe({
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'MENU_ENTRY_ADDED',
+        message: `${req.user.email} додав(ла) до меню на ${menuDate} страву \"${dish.title}\"`,
+        details: {
+          menuEntryId: menuEntry.id,
+          menuDate,
+          dishId: dish.id,
+          dishTitle: dish.title,
+        },
+      })
+    }
+
     return res.status(201).json(menuEntry)
   } catch (error) {
     if (String(error.message).includes('UNIQUE constraint failed')) {
@@ -419,10 +580,26 @@ app.delete('/api/menu-plan/:id', authRequired, (req, res) => {
   }
 
   try {
+    const menuEntry = getMenuEntryById(menuEntryId)
     const deleted = deleteMenuEntryById(menuEntryId)
 
     if (!deleted) {
       return res.status(404).json({ message: 'Елемент меню не знайдено' })
+    }
+
+    if (menuEntry) {
+      addActivityLogSafe({
+        actorUserId: req.user.id,
+        actorEmail: req.user.email,
+        action: 'MENU_ENTRY_REMOVED',
+        message: `${req.user.email} прибрав(ла) з меню на ${menuEntry.menuDate} страву \"${menuEntry.title}\"`,
+        details: {
+          menuEntryId,
+          menuDate: menuEntry.menuDate,
+          dishId: menuEntry.id,
+          dishTitle: menuEntry.title,
+        },
+      })
     }
 
     return res.json({ success: true })
