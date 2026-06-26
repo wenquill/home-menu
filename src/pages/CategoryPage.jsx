@@ -105,6 +105,8 @@ export default function CategoryPage({
   const [dishToDelete, setDishToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState('')
   const [isDeletingDish, setIsDeletingDish] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const [copyMessageTimeoutId, setCopyMessageTimeoutId] = useState(null)
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -145,12 +147,25 @@ export default function CategoryPage({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedDish, isEditModalOpen, dishToDelete])
 
+  useEffect(() => {
+    return () => {
+      if (copyMessageTimeoutId) {
+        window.clearTimeout(copyMessageTimeoutId)
+      }
+    }
+  }, [copyMessageTimeoutId])
+
   const closeModals = () => {
     setSelectedDish(null)
     setIsEditModalOpen(false)
     setDishToDelete(null)
     setEditError('')
     setDeleteError('')
+    setCopyMessage('')
+    if (copyMessageTimeoutId) {
+      window.clearTimeout(copyMessageTimeoutId)
+      setCopyMessageTimeoutId(null)
+    }
   }
 
   const loadDishDetails = async (dish) => {
@@ -260,6 +275,41 @@ export default function CategoryPage({
     }
   }
 
+  const copyRecipeToClipboard = async () => {
+    if (!selectedDish?.recipe) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(selectedDish.recipe)
+      setCopyMessage('рецепт скопійовано')
+
+      if (copyMessageTimeoutId) {
+        window.clearTimeout(copyMessageTimeoutId)
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        setCopyMessage('')
+        setCopyMessageTimeoutId(null)
+      }, 3000)
+
+      setCopyMessageTimeoutId(timeoutId)
+    } catch (_error) {
+      setCopyMessage('не вдалося скопіювати рецепт')
+
+      if (copyMessageTimeoutId) {
+        window.clearTimeout(copyMessageTimeoutId)
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        setCopyMessage('')
+        setCopyMessageTimeoutId(null)
+      }, 3000)
+
+      setCopyMessageTimeoutId(timeoutId)
+    }
+  }
+
   return (
     <main className="category-page">
       <h1 className="category-title">{category?.name || 'Меню'}</h1>
@@ -315,8 +365,22 @@ export default function CategoryPage({
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
             {selectedDish.recipe ? (
               <div className="dish-recipe-block">
-                <p>рецепт:</p>
+                <div className="dish-recipe-header">
+                  <p>рецепт:</p>
+                  <button
+                    type="button"
+                    className="dish-icon-button dish-icon-button--copy"
+                    aria-label="Скопіювати рецепт"
+                    title="Скопіювати рецепт"
+                    onClick={copyRecipeToClipboard}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M16 1H6C4.9 1 4 1.9 4 3v12h2V3h10V1zm3 4H10c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h9c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16h-9V7h9v14z" />
+                    </svg>
+                  </button>
+                </div>
                 <pre>{selectedDish.recipe}</pre>
+                {copyMessage ? <p className="dish-copy-message">{copyMessage}</p> : null}
               </div>
             ) : null}
             {selectedDish.components?.length ? (
