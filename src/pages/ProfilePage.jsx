@@ -34,28 +34,6 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
     setAvatarDataUrl(currentUser.avatarUrl || '')
   }, [currentUser])
 
-  const onAvatarChange = (event) => {
-    const file = event.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setFormError('Оберіть файл зображення для аватара')
-      return
-    }
-
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      setAvatarDataUrl(String(reader.result || ''))
-      setFormError('')
-    }
-
-    reader.readAsDataURL(file)
-  }
-
   const submit = async (event) => {
     event.preventDefault()
     setFormError('')
@@ -125,16 +103,6 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
                 </button>
               ))}
             </div>
-            <label className="avatar-upload-label" htmlFor="avatar-upload">
-              Завантажити фотографію
-            </label>
-            <input
-              className="avatar-upload-input"
-              id="avatar-upload"
-              type="file"
-              accept="image/*"
-              onChange={onAvatarChange}
-            />
           </div>
 
           <label htmlFor="profile-display-name">Імʼя для відображення</label>
