@@ -268,33 +268,58 @@ body {
   font-weight: 700;
 }
 
+.dish-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dish-card-header h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.dish-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dish-icon-button {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  color: #111;
+}
+
+.dish-icon-button svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.dish-icon-button:hover {
+  opacity: 0.72;
+}
+
+.dish-icon-button:focus-visible {
+  outline: 2px solid #f3c400;
+  outline-offset: 2px;
+}
+
 .dish-card p {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.45;
-}
-
-.dish-edit-link {
-  display: inline-block;
-  margin-top: 10px;
-  color: var(--text);
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.dish-edit-button {
-  margin-top: 10px;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 700;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
 }
 
 .dish-modal-overlay {
@@ -318,6 +343,10 @@ body {
   position: relative;
 }
 
+.dish-modal--confirm {
+  width: min(420px, 100%);
+}
+
 .dish-modal h2 {
   margin: 0;
   font-size: 24px;
@@ -327,6 +356,10 @@ body {
   margin: 10px 0 0;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.dish-modal-warning {
+  margin-top: 12px;
 }
 
 .dish-modal-tags {
@@ -403,6 +436,21 @@ body {
 .dish-modal-secondary {
   border-color: var(--line) !important;
   background: #fff !important;
+}
+
+.dish-modal-actions--confirm {
+  margin-top: 16px;
+}
+
+.dish-modal-danger {
+  border-color: #8d1f1f !important;
+  background: #b62828 !important;
+  color: #fff !important;
+}
+
+.dish-modal-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .dish-card--empty {

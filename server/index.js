@@ -6,6 +6,7 @@ import {
   createUser,
   createCategory,
   createDish,
+  deleteDish,
   getDishById,
   getCategories,
   getCategoryById,
@@ -323,6 +324,26 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
     return res.json(dish)
   } catch (_error) {
     return res.status(500).json({ message: 'Не вдалося оновити страву' })
+  }
+})
+
+app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
+  const dishId = Number(req.params.id)
+
+  if (Number.isNaN(dishId)) {
+    return res.status(400).json({ message: 'Некоректний id страви' })
+  }
+
+  const existingDish = getDishById(dishId)
+  if (!existingDish) {
+    return res.status(404).json({ message: 'Страву не знайдено' })
+  }
+
+  try {
+    deleteDish(dishId)
+    return res.json({ success: true })
+  } catch (_error) {
+    return res.status(500).json({ message: 'Не вдалося видалити страву' })
   }
 })
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 
-function DishCard({ title, description, isAdmin, onOpen, onEdit }) {
+function DishCard({ title, description, isAdmin, onOpen, onEdit, onDelete }) {
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -18,20 +18,42 @@ function DishCard({ title, description, isAdmin, onOpen, onEdit }) {
       onKeyDown={handleKeyDown}
       aria-label={`Відкрити страву ${title}`}
     >
-      <h3>{title}</h3>
+      <div className="dish-card-header">
+        <h3>{title}</h3>
+        {isAdmin ? (
+          <div className="dish-card-actions">
+            <button
+              type="button"
+              className="dish-icon-button"
+              aria-label="Редагувати"
+              title="Редагувати"
+              onClick={(event) => {
+                event.stopPropagation()
+                onEdit()
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92-9.06 9.06zM20.71 5.63a1 1 0 000-1.41l-1.93-1.93a1 1 0 00-1.41 0l-1.5 1.5 3.75 3.75 1.09-1.09z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="dish-icon-button"
+              aria-label="Видалити"
+              title="Видалити"
+              onClick={(event) => {
+                event.stopPropagation()
+                onDelete()
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 10h2v8H7v-8zm-1 10h12l1-13H5l1 13z" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
+      </div>
       <p>{description}</p>
-      {isAdmin ? (
-        <button
-          type="button"
-          className="dish-edit-button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onEdit()
-          }}
-        >
-          Редагувати
-        </button>
-      ) : null}
     </article>
   )
 }
@@ -43,6 +65,7 @@ export default function CategoryPage({
   defaultCategoryId,
   isAdmin,
   onUpdateDish,
+  onDeleteDish,
 }) {
   const { categoryId } = useParams()
   const selectedCategoryId = Number(categoryId)
@@ -54,6 +77,9 @@ export default function CategoryPage({
   const [editTypeCategoryId, setEditTypeCategoryId] = useState('')
   const [editError, setEditError] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [dishToDelete, setDishToDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [isDeletingDish, setIsDeletingDish] = useState(false)
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -77,7 +103,7 @@ export default function CategoryPage({
   const isEmptyCategory = filteredDishes.length === 0
 
   useEffect(() => {
-    if (!selectedDish && !isEditModalOpen) {
+    if (!selectedDish && !isEditModalOpen && !dishToDelete) {
       return undefined
     }
 
@@ -85,17 +111,21 @@ export default function CategoryPage({
       if (event.key === 'Escape') {
         setSelectedDish(null)
         setIsEditModalOpen(false)
+        setDishToDelete(null)
+        setDeleteError('')
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedDish, isEditModalOpen])
+  }, [selectedDish, isEditModalOpen, dishToDelete])
 
   const closeModals = () => {
     setSelectedDish(null)
     setIsEditModalOpen(false)
+    setDishToDelete(null)
     setEditError('')
+    setDeleteError('')
   }
 
   const openEditModal = (dish) => {
@@ -135,6 +165,33 @@ export default function CategoryPage({
     }
   }
 
+  const openDeleteModal = (dish) => {
+    if (!dish) {
+      return
+    }
+
+    setDishToDelete(dish)
+    setDeleteError('')
+  }
+
+  const deleteCurrentDish = async () => {
+    if (!dishToDelete || !onDeleteDish) {
+      return
+    }
+
+    setDeleteError('')
+    setIsDeletingDish(true)
+
+    try {
+      await onDeleteDish(dishToDelete.id)
+      closeModals()
+    } catch (error) {
+      setDeleteError(error.message)
+    } finally {
+      setIsDeletingDish(false)
+    }
+  }
+
   return (
     <main className="category-page">
       <h1 className="category-title">{category?.name || 'Меню'}</h1>
@@ -153,6 +210,7 @@ export default function CategoryPage({
               isAdmin={isAdmin}
               onOpen={() => setSelectedDish(dish)}
               onEdit={() => openEditModal(dish)}
+              onDelete={() => openDeleteModal(dish)}
             />
           ))}
         </section>
@@ -265,6 +323,43 @@ export default function CategoryPage({
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      ) : null}
+
+      {dishToDelete ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeModals}>
+          <section
+            className="dish-modal dish-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Видалити страву ${dishToDelete.title}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="dish-modal-close"
+              aria-label="Закрити"
+              onClick={closeModals}
+            >
+              ×
+            </button>
+
+            <h2>Видалити страву?</h2>
+            <p className="dish-modal-warning">
+              Страва <strong>{dishToDelete.title}</strong> буде видалена назавжди.
+            </p>
+
+            {deleteError ? <p className="state-message state-message--error">{deleteError}</p> : null}
+
+            <div className="dish-modal-actions dish-modal-actions--confirm">
+              <button type="button" className="dish-modal-secondary" onClick={closeModals}>
+                скасувати
+              </button>
+              <button type="button" className="dish-modal-danger" onClick={deleteCurrentDish} disabled={isDeletingDish}>
+                {isDeletingDish ? 'видаляю...' : 'видалити'}
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

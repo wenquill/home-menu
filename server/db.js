@@ -299,6 +299,11 @@ export function updateDish({ id, title, description, mealCategoryId, typeCategor
   return getDishById(id)
 }
 
+export function deleteDish(id) {
+  const result = db.prepare('DELETE FROM dishes WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
 export function getUserByEmail(email) {
   return db
     .prepare(

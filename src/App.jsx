@@ -38,6 +38,16 @@ async function apiRequest(path, options = {}, token = '') {
     throw new Error(message)
   }
 
+  // Some endpoints (for example DELETE) may return no body.
+  if (response.status === 204) {
+    return null
+  }
+
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    return null
+  }
+
   return response.json()
 }
 
@@ -198,6 +208,22 @@ function App() {
     return updated
   }
 
+  const handleDeleteDish = async (id) => {
+    if (!isAdmin) {
+      throw new Error('Доступ лише для адміністратора')
+    }
+
+    await apiRequest(
+      `/api/dishes/${id}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+
+    await loadMenuData({ background: true })
+  }
+
   const emptyStateElement = (
     <main className="category-page">
       <h1>Категорії ще не створені</h1>
@@ -254,6 +280,7 @@ function App() {
               defaultCategoryId={defaultCategoryId}
               isAdmin={isAdmin}
               onUpdateDish={handleUpdateDish}
+              onDeleteDish={handleDeleteDish}
             />
           )}
         />
