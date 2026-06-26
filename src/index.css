@@ -391,6 +391,14 @@ body {
   outline-offset: 2px;
 }
 
+.dish-icon-button--favorite {
+  color: #8f8f8f;
+}
+
+.dish-icon-button--favorite.dish-icon-button--active {
+  color: #d73636;
+}
+
 .dish-card p {
   margin: 8px 0 0;
   color: var(--muted);
@@ -797,6 +805,22 @@ body {
 
 .menu-schedule-toast {
   margin-top: 12px;
+}
+
+.favorite-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #1b7d41;
+  background: #ecfdf2;
+  color: #166534;
+  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+  z-index: 210;
 }
 
 .dish-copy-message {

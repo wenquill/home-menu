@@ -1,11 +1,37 @@
 import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const dbPath = path.join(__dirname, 'data.sqlite')
+const legacyDbPath = path.join(__dirname, 'data.sqlite')
+const configuredDbPath = String(process.env.SQLITE_PATH || '').trim()
+
+const dbPath = configuredDbPath
+  ? (path.isAbsolute(configuredDbPath)
+      ? configuredDbPath
+      : path.resolve(process.cwd(), configuredDbPath))
+  : legacyDbPath
+
+function ensureDatabaseLocation(targetPath) {
+  const targetDir = path.dirname(targetPath)
+  fs.mkdirSync(targetDir, { recursive: true })
+
+  if (targetPath === legacyDbPath) {
+    return
+  }
+
+  const targetExists = fs.existsSync(targetPath)
+  const legacyExists = fs.existsSync(legacyDbPath)
+
+  if (!targetExists && legacyExists) {
+    fs.copyFileSync(legacyDbPath, targetPath)
+  }
+}
+
+ensureDatabaseLocation(dbPath)
 
 const db = new Database(dbPath)
 db.pragma('foreign_keys = ON')
@@ -412,6 +438,16 @@ export function initializeDatabase() {
       FOREIGN KEY (menu_entry_id) REFERENCES menu_entries(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS user_favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      dish_id INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+      UNIQUE(user_id, dish_id)
+    );
+
     CREATE TABLE IF NOT EXISTS activity_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       actor_user_id INTEGER NOT NULL,
@@ -438,6 +474,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_dish_components_dish ON dish_components(dish_id);
     CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
     CREATE INDEX IF NOT EXISTS idx_menu_entry_components_entry ON menu_entry_components(menu_entry_id);
+    CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_id);
     CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -500,6 +537,24 @@ export function initializeDatabase() {
         FOREIGN KEY (menu_entry_id) REFERENCES menu_entries(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_menu_entry_components_entry ON menu_entry_components(menu_entry_id);
+    `)
+  }
+
+  const favoriteColumns = db.prepare("PRAGMA table_info('user_favorites')").all()
+  const hasFavoritesTable = favoriteColumns.length > 0
+
+  if (!hasFavoritesTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS user_favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        dish_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+        UNIQUE(user_id, dish_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_id);
     `)
   }
 
@@ -782,6 +837,35 @@ export function getMenuEntriesByDate(menuDate) {
     .all(normalizedDate)
 
   return attachMenuEntryComponents(menuEntries)
+}
+
+export function getFavoriteDishIdsForUser(userId) {
+  const rows = db
+    .prepare(
+      `SELECT dish_id AS dishId
+       FROM user_favorites
+       WHERE user_id = ?
+       ORDER BY id DESC`,
+    )
+    .all(userId)
+
+  return rows.map((row) => Number(row.dishId))
+}
+
+export function addFavoriteDishForUser(userId, dishId) {
+  const result = db
+    .prepare('INSERT OR IGNORE INTO user_favorites (user_id, dish_id) VALUES (?, ?)')
+    .run(userId, dishId)
+
+  return result.changes > 0
+}
+
+export function removeFavoriteDishForUser(userId, dishId) {
+  const result = db
+    .prepare('DELETE FROM user_favorites WHERE user_id = ? AND dish_id = ?')
+    .run(userId, dishId)
+
+  return result.changes > 0
 }
 
 export function getUserByEmail(email) {

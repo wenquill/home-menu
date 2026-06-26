@@ -3,6 +3,7 @@ import cors from 'cors'
 import express from 'express'
 import jwt from 'jsonwebtoken'
 import {
+  addFavoriteDishForUser,
   createUser,
   createActivityLog,
   createCategory,
@@ -19,9 +20,11 @@ import {
   getUnreadActivityLogsCountForUser,
   markActivityLogsAsReadForUser,
   getDishes,
+  getFavoriteDishIdsForUser,
   getUserByEmail,
   getUserById,
   initializeDatabase,
+  removeFavoriteDishForUser,
   updateUserById,
   updateDish,
 } from './db.js'
@@ -344,6 +347,38 @@ app.get('/api/dishes/:id', (req, res) => {
   }
 
   return res.json(dish)
+})
+
+app.get('/api/favorites', authRequired, (req, res) => {
+  const dishIds = getFavoriteDishIdsForUser(req.user.id)
+  return res.json({ dishIds })
+})
+
+app.post('/api/favorites/:dishId', authRequired, (req, res) => {
+  const dishId = Number(req.params.dishId)
+
+  if (Number.isNaN(dishId)) {
+    return res.status(400).json({ message: 'Некоректний id страви' })
+  }
+
+  const dish = getDishById(dishId)
+  if (!dish) {
+    return res.status(404).json({ message: 'Страву не знайдено' })
+  }
+
+  addFavoriteDishForUser(req.user.id, dishId)
+  return res.status(201).json({ success: true })
+})
+
+app.delete('/api/favorites/:dishId', authRequired, (req, res) => {
+  const dishId = Number(req.params.dishId)
+
+  if (Number.isNaN(dishId)) {
+    return res.status(400).json({ message: 'Некоректний id страви' })
+  }
+
+  removeFavoriteDishForUser(req.user.id, dishId)
+  return res.json({ success: true })
 })
 
 app.post('/api/dishes', authRequired, adminRequired, (req, res) => {

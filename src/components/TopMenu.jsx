@@ -208,6 +208,9 @@ export default function TopMenu({
                 >
                   Страви
                 </NavLink>
+                <NavLink to="/favorites" className={linkClass}>
+                  Улюблені
+                </NavLink>
                 <NavLink to="/menu" className={linkClass}>
                   Меню
                 </NavLink>

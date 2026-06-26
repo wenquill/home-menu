@@ -8,8 +8,10 @@ function DishCard({
   components,
   mealCategoryName,
   typeCategoryName,
+  isFavorite,
   isAdmin,
   onOpen,
+  onToggleFavorite,
   onEdit,
   onDelete,
   onAddToMenu,
@@ -47,38 +49,54 @@ function DishCard({
     >
       <div className="dish-card-header">
         <h3>{title}</h3>
-        {isAdmin ? (
-          <div className="dish-card-actions">
-            <button
-              type="button"
-              className="dish-icon-button"
-              aria-label="Редагувати"
-              title="Редагувати"
-              onClick={(event) => {
-                event.stopPropagation()
-                onEdit()
-              }}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92-9.06 9.06zM20.71 5.63a1 1 0 000-1.41l-1.93-1.93a1 1 0 00-1.41 0l-1.5 1.5 3.75 3.75 1.09-1.09z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="dish-icon-button"
-              aria-label="Видалити"
-              title="Видалити"
-              onClick={(event) => {
-                event.stopPropagation()
-                onDelete()
-              }}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 10h2v8H7v-8zm-1 10h12l1-13H5l1 13z" />
-              </svg>
-            </button>
-          </div>
-        ) : null}
+        <div className="dish-card-actions">
+          <button
+            type="button"
+            className={isFavorite ? 'dish-icon-button dish-icon-button--favorite dish-icon-button--active' : 'dish-icon-button dish-icon-button--favorite'}
+            aria-label={isFavorite ? 'Видалити з улюблених' : 'Додати в улюблені'}
+            title={isFavorite ? 'Видалити з улюблених' : 'Додати в улюблені'}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleFavorite?.()
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.01 6.01 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          </button>
+          {isAdmin ? (
+            <>
+              <button
+                type="button"
+                className="dish-icon-button"
+                aria-label="Редагувати"
+                title="Редагувати"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onEdit()
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92-9.06 9.06zM20.71 5.63a1 1 0 000-1.41l-1.93-1.93a1 1 0 00-1.41 0l-1.5 1.5 3.75 3.75 1.09-1.09z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="dish-icon-button"
+                aria-label="Видалити"
+                title="Видалити"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 10h2v8H7v-8zm-1 10h12l1-13H5l1 13z" />
+                </svg>
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
       <p>{description}</p>
       {components?.length ? (
@@ -111,10 +129,13 @@ function DishCard({
 }
 
 export default function CategoryPage({
+  viewMode = 'category',
   mealCategories,
   typeCategories,
   dishes,
   defaultCategoryId,
+  favoriteDishIds = [],
+  onToggleFavoriteDish,
   isAdmin,
   onUpdateDish,
   onDeleteDish,
@@ -122,7 +143,8 @@ export default function CategoryPage({
   onScheduleDishToMenu,
 }) {
   const { categoryId } = useParams()
-  const isAllDishesView = categoryId === 'all'
+  const isFavoritesView = viewMode === 'favorites'
+  const isAllDishesView = !isFavoritesView && categoryId === 'all'
   const selectedCategoryId = Number(categoryId)
   const [selectedDish, setSelectedDish] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -147,20 +169,28 @@ export default function CategoryPage({
   const [isSchedulingMenu, setIsSchedulingMenu] = useState(false)
   const [scheduleMessage, setScheduleMessage] = useState('')
   const [scheduleMessageTimeoutId, setScheduleMessageTimeoutId] = useState(null)
+  const [favoriteToastMessage, setFavoriteToastMessage] = useState('')
+  const [favoriteToastTimeoutId, setFavoriteToastTimeoutId] = useState(null)
   const [searchText, setSearchText] = useState('')
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
     [mealCategories, typeCategories],
   )
+  const favoriteDishIdSet = useMemo(
+    () => new Set((favoriteDishIds || []).map((id) => Number(id))),
+    [favoriteDishIds],
+  )
 
   const category = allCategories.find((item) => item.id === selectedCategoryId)
 
-  if (!isAllDishesView && !category && defaultCategoryId) {
+  if (!isFavoritesView && !isAllDishesView && !category && defaultCategoryId) {
     return <Navigate to={`/category/${defaultCategoryId}`} replace />
   }
 
-  const filteredDishes = isAllDishesView
+  const filteredDishes = isFavoritesView
+    ? dishes.filter((dish) => favoriteDishIdSet.has(dish.id))
+    : isAllDishesView
     ? dishes
     : category
     ? dishes.filter(
@@ -170,9 +200,9 @@ export default function CategoryPage({
       )
     : []
 
-  const categoryLabel = isAllDishesView ? 'усі страви' : category?.name || 'меню'
+  const categoryLabel = isFavoritesView ? 'улюблені страви' : isAllDishesView ? 'усі страви' : category?.name || 'меню'
   const dishListAriaLabel = `Страви: ${categoryLabel}`
-  const dishKeyPrefix = isAllDishesView ? 'all' : String(selectedCategoryId)
+  const dishKeyPrefix = isFavoritesView ? 'favorites' : isAllDishesView ? 'all' : String(selectedCategoryId)
   const normalizedSearch = searchText.trim().toLowerCase()
 
   const visibleDishes = normalizedSearch
@@ -220,6 +250,14 @@ export default function CategoryPage({
       }
     }
   }, [copyMessageTimeoutId])
+
+  useEffect(() => {
+    return () => {
+      if (favoriteToastTimeoutId) {
+        window.clearTimeout(favoriteToastTimeoutId)
+      }
+    }
+  }, [favoriteToastTimeoutId])
 
   const closeModals = () => {
     setSelectedDish(null)
@@ -463,6 +501,37 @@ export default function CategoryPage({
     }
   }
 
+  const showFavoriteToast = (message) => {
+    setFavoriteToastMessage(message)
+
+    if (favoriteToastTimeoutId) {
+      window.clearTimeout(favoriteToastTimeoutId)
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFavoriteToastMessage('')
+      setFavoriteToastTimeoutId(null)
+    }, 2800)
+
+    setFavoriteToastTimeoutId(timeoutId)
+  }
+
+  const toggleFavorite = async (dishId, isFavorite) => {
+    if (!onToggleFavoriteDish) {
+      return
+    }
+
+    try {
+      const result = await onToggleFavoriteDish(dishId, isFavorite)
+
+      if (result?.added) {
+        showFavoriteToast('страву додано в улюблені')
+      }
+    } catch (_error) {
+      // Silent fail here to avoid blocking modal/card interactions.
+    }
+  }
+
   return (
     <main className="category-page">
       <h1 className="category-title">{categoryLabel}</h1>
@@ -496,9 +565,13 @@ export default function CategoryPage({
               components={dish.components}
               mealCategoryName={dish.mealCategoryName}
               typeCategoryName={dish.typeCategoryName}
+              isFavorite={favoriteDishIdSet.has(dish.id)}
               isAdmin={isAdmin}
               onOpen={() => {
                 void openDishModal(dish)
+              }}
+              onToggleFavorite={() => {
+                void toggleFavorite(dish.id, favoriteDishIdSet.has(dish.id))
               }}
               onEdit={() => {
                 void openEditModal(dish)
@@ -830,6 +903,7 @@ export default function CategoryPage({
       ) : null}
 
       {scheduleMessage ? <p className="state-message menu-schedule-toast">{scheduleMessage}</p> : null}
+      {favoriteToastMessage ? <p className="state-message favorite-toast">{favoriteToastMessage}</p> : null}
     </main>
   )
 }

@@ -59,6 +59,7 @@ function App() {
   const [pageError, setPageError] = useState('')
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || '')
   const [currentUser, setCurrentUser] = useState(null)
+  const [favoriteDishIds, setFavoriteDishIds] = useState([])
   const [authReady, setAuthReady] = useState(false)
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
   const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
@@ -87,6 +88,18 @@ function App() {
       if (!background) {
         setIsLoading(false)
       }
+    }
+  }
+
+  const loadFavoriteDishIds = async () => {
+    try {
+      const data = await apiRequest('/api/favorites', {}, authToken)
+      const ids = Array.isArray(data?.dishIds)
+        ? data.dishIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+        : []
+      setFavoriteDishIds(ids)
+    } catch (error) {
+      setPageError(error.message)
     }
   }
 
@@ -121,12 +134,14 @@ function App() {
 
     if (!isAuthenticated) {
       setMenuData(emptyMenu)
+      setFavoriteDishIds([])
       setPageError('')
       setIsLoading(false)
       return
     }
 
     loadMenuData()
+    loadFavoriteDishIds()
   }, [authReady, isAuthenticated, authToken])
 
   const handleAuthSubmit = async ({ email, password, displayName, mode }) => {
@@ -294,6 +309,27 @@ function App() {
     return apiRequest('/api/activity-logs/unread-count', {}, authToken)
   }
 
+  const handleToggleFavoriteDish = async (dishId, isCurrentlyFavorite) => {
+    if (!isAuthenticated) {
+      throw new Error('Потрібна авторизація')
+    }
+
+    const normalizedDishId = Number(dishId)
+    if (Number.isNaN(normalizedDishId)) {
+      throw new Error('Некоректний id страви')
+    }
+
+    if (isCurrentlyFavorite) {
+      await apiRequest(`/api/favorites/${normalizedDishId}`, { method: 'DELETE' }, authToken)
+      setFavoriteDishIds((prev) => prev.filter((id) => id !== normalizedDishId))
+      return { added: false }
+    }
+
+    await apiRequest(`/api/favorites/${normalizedDishId}`, { method: 'POST' }, authToken)
+    setFavoriteDishIds((prev) => (prev.includes(normalizedDishId) ? prev : [normalizedDishId, ...prev]))
+    return { added: true }
+  }
+
   const openAddCategoryModal = () => {
     if (!isAdmin) {
       return
@@ -376,6 +412,27 @@ function App() {
               dishes={menuData.dishes}
               defaultCategoryId={defaultCategoryId}
               isAdmin={isAdmin}
+              favoriteDishIds={favoriteDishIds}
+              onToggleFavoriteDish={handleToggleFavoriteDish}
+              onUpdateDish={handleUpdateDish}
+              onDeleteDish={handleDeleteDish}
+              onGetDishById={handleGetDishById}
+              onScheduleDishToMenu={handleScheduleDishToMenu}
+            />
+          )}
+        />
+        <Route
+          path="/favorites"
+          element={protectedContent(
+            <CategoryPage
+              viewMode="favorites"
+              mealCategories={menuData.mealCategories}
+              typeCategories={menuData.typeCategories}
+              dishes={menuData.dishes}
+              defaultCategoryId={defaultCategoryId}
+              isAdmin={isAdmin}
+              favoriteDishIds={favoriteDishIds}
+              onToggleFavoriteDish={handleToggleFavoriteDish}
               onUpdateDish={handleUpdateDish}
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
