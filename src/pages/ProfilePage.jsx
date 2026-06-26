@@ -89,7 +89,7 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
 
   return (
     <main className="category-page">
-      <h1>Профіль</h1>
+      <h1 className="category-title">Профіль</h1>
 
       <section className="admin-panel" aria-label="Налаштування профілю">
         <form className="admin-form" onSubmit={submit}>
