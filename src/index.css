@@ -528,6 +528,16 @@ body {
   padding: 10px 12px;
 }
 
+.admin-form textarea,
+.dish-modal-form textarea {
+  min-width: 100%;
+  max-width: 100%;
+  min-height: 96px;
+  max-height: 220px;
+  resize: vertical;
+  overflow-y: auto;
+}
+
 .admin-form button {
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
