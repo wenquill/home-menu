@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 
-function DishCard({ id, title, description, components, isAdmin, onOpen, onEdit, onDelete }) {
+function DishCard({
+  id,
+  title,
+  description,
+  components,
+  mealCategoryName,
+  typeCategoryName,
+  isAdmin,
+  onOpen,
+  onEdit,
+  onDelete,
+  onAddToMenu,
+}) {
   const cornerOffsets = [
     { x: '10%', y: '10%' },
     { x: '90%', y: '10%' },
@@ -76,6 +88,24 @@ function DishCard({ id, title, description, components, isAdmin, onOpen, onEdit,
           ))}
         </div>
       ) : null}
+      <div className="dish-card-categories" aria-label="категорії страви">
+        <span className="dish-card-categories-label">категорії:</span>
+        <span>{mealCategoryName}</span>
+        <span className="dish-card-categories-separator">/</span>
+        <span>{typeCategoryName}</span>
+      </div>
+      {onAddToMenu ? (
+        <button
+          type="button"
+          className="dish-add-to-menu-button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onAddToMenu()
+          }}
+        >
+          додати до меню
+        </button>
+      ) : null}
     </article>
   )
 }
@@ -89,6 +119,7 @@ export default function CategoryPage({
   onUpdateDish,
   onDeleteDish,
   onGetDishById,
+  onScheduleDishToMenu,
 }) {
   const { categoryId } = useParams()
   const selectedCategoryId = Number(categoryId)
@@ -107,6 +138,13 @@ export default function CategoryPage({
   const [isDeletingDish, setIsDeletingDish] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [copyMessageTimeoutId, setCopyMessageTimeoutId] = useState(null)
+  const [menuScheduleDish, setMenuScheduleDish] = useState(null)
+  const [menuScheduleMode, setMenuScheduleMode] = useState('today')
+  const [menuScheduleDate, setMenuScheduleDate] = useState('')
+  const [menuScheduleError, setMenuScheduleError] = useState('')
+  const [isSchedulingMenu, setIsSchedulingMenu] = useState(false)
+  const [scheduleMessage, setScheduleMessage] = useState('')
+  const [scheduleMessageTimeoutId, setScheduleMessageTimeoutId] = useState(null)
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -130,7 +168,7 @@ export default function CategoryPage({
   const isEmptyCategory = filteredDishes.length === 0
 
   useEffect(() => {
-    if (!selectedDish && !isEditModalOpen && !dishToDelete) {
+    if (!selectedDish && !isEditModalOpen && !dishToDelete && !menuScheduleDish) {
       return undefined
     }
 
@@ -139,13 +177,15 @@ export default function CategoryPage({
         setSelectedDish(null)
         setIsEditModalOpen(false)
         setDishToDelete(null)
+        setMenuScheduleDish(null)
         setDeleteError('')
+        setMenuScheduleError('')
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedDish, isEditModalOpen, dishToDelete])
+  }, [selectedDish, isEditModalOpen, dishToDelete, menuScheduleDish])
 
   useEffect(() => {
     return () => {
@@ -162,10 +202,78 @@ export default function CategoryPage({
     setEditError('')
     setDeleteError('')
     setCopyMessage('')
+    setMenuScheduleDish(null)
+    setMenuScheduleError('')
+    setScheduleMessage('')
     if (copyMessageTimeoutId) {
       window.clearTimeout(copyMessageTimeoutId)
       setCopyMessageTimeoutId(null)
     }
+    if (scheduleMessageTimeoutId) {
+      window.clearTimeout(scheduleMessageTimeoutId)
+      setScheduleMessageTimeoutId(null)
+    }
+  }
+
+  const todayDateString = () => new Date().toISOString().slice(0, 10)
+
+  const tomorrowDateString = () => {
+    const date = new Date()
+    date.setDate(date.getDate() + 1)
+    return date.toISOString().slice(0, 10)
+  }
+
+  const openScheduleMenuModal = (dish) => {
+    setMenuScheduleDish(dish)
+    setMenuScheduleMode('today')
+    setMenuScheduleDate(todayDateString())
+    setMenuScheduleError('')
+  }
+
+  const closeScheduleMenuModal = () => {
+    setMenuScheduleDish(null)
+    setMenuScheduleError('')
+  }
+
+  const scheduleDish = async (menuDate) => {
+    if (!menuScheduleDish || !onScheduleDishToMenu) {
+      return
+    }
+
+    setMenuScheduleError('')
+    setIsSchedulingMenu(true)
+
+    try {
+      await onScheduleDishToMenu({ dishId: menuScheduleDish.id, menuDate })
+      closeScheduleMenuModal()
+      setScheduleMessage('додано до меню')
+
+      if (scheduleMessageTimeoutId) {
+        window.clearTimeout(scheduleMessageTimeoutId)
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        setScheduleMessage('')
+        setScheduleMessageTimeoutId(null)
+      }, 3000)
+
+      setScheduleMessageTimeoutId(timeoutId)
+    } catch (error) {
+      setMenuScheduleError(error.message)
+    } finally {
+      setIsSchedulingMenu(false)
+    }
+  }
+
+  const confirmCustomSchedule = async (event) => {
+    event.preventDefault()
+
+    if (!menuScheduleDate) {
+      setMenuScheduleError('Оберіть дату')
+      return
+    }
+
+    await scheduleDish(menuScheduleDate)
   }
 
   const loadDishDetails = async (dish) => {
@@ -327,6 +435,8 @@ export default function CategoryPage({
               title={dish.title}
               description={dish.description}
               components={dish.components}
+              mealCategoryName={dish.mealCategoryName}
+              typeCategoryName={dish.typeCategoryName}
               isAdmin={isAdmin}
               onOpen={() => {
                 void openDishModal(dish)
@@ -335,6 +445,7 @@ export default function CategoryPage({
                 void openEditModal(dish)
               }}
               onDelete={() => openDeleteModal(dish)}
+              onAddToMenu={() => openScheduleMenuModal(dish)}
             />
           ))}
         </section>
@@ -549,6 +660,67 @@ export default function CategoryPage({
           </section>
         </div>
       ) : null}
+
+      {menuScheduleDish ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeScheduleMenuModal}>
+          <section
+            className="dish-modal dish-modal--schedule"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Додати ${menuScheduleDish.title} до меню`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeScheduleMenuModal}>
+              ×
+            </button>
+
+            <h2>додати до меню</h2>
+            <p className="dish-modal-warning">
+              Оберіть, на яку дату запланувати страву <strong>{menuScheduleDish.title}</strong>.
+            </p>
+
+            {menuScheduleError ? <p className="state-message state-message--error">{menuScheduleError}</p> : null}
+
+            <div className="menu-schedule-options">
+              <button type="button" className="menu-schedule-option" onClick={() => void scheduleDish(todayDateString())} disabled={isSchedulingMenu}>
+                сьогоднішнє меню
+              </button>
+              <button type="button" className="menu-schedule-option" onClick={() => void scheduleDish(tomorrowDateString())} disabled={isSchedulingMenu}>
+                завтрашнє меню
+              </button>
+            </div>
+
+            <div className="menu-schedule-custom">
+              <button
+                type="button"
+                className={menuScheduleMode === 'custom' ? 'menu-schedule-option menu-schedule-option--active' : 'menu-schedule-option'}
+                onClick={() => {
+                  setMenuScheduleMode('custom')
+                  setMenuScheduleError('')
+                }}
+                disabled={isSchedulingMenu}
+              >
+                вибрати дату
+              </button>
+
+              {menuScheduleMode === 'custom' ? (
+                <form className="menu-schedule-form" onSubmit={confirmCustomSchedule}>
+                  <input
+                    type="date"
+                    value={menuScheduleDate}
+                    onChange={(event) => setMenuScheduleDate(event.target.value)}
+                  />
+                  <button type="submit" disabled={isSchedulingMenu}>
+                    {isSchedulingMenu ? 'додаю...' : 'додати'}
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {scheduleMessage ? <p className="state-message menu-schedule-toast">{scheduleMessage}</p> : null}
     </main>
   )
 }

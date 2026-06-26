@@ -6,6 +6,7 @@ import AddDishPage from './pages/AddDishPage'
 import AuthPage from './pages/AuthPage'
 import CategoryPage from './pages/CategoryPage'
 import EditDishPage from './pages/EditDishPage'
+import MenuPage from './pages/MenuPage'
 import ProfilePage from './pages/ProfilePage'
 
 const emptyMenu = {
@@ -248,6 +249,35 @@ function App() {
     return apiRequest(`/api/dishes/${id}`, {}, authToken)
   }
 
+  const handleGetMenuEntriesByDate = async (menuDate) => {
+    return apiRequest(`/api/menu-plan?date=${encodeURIComponent(menuDate)}`, {}, authToken)
+  }
+
+  const handleScheduleDishToMenu = async ({ dishId, menuDate }) => {
+    if (!isAuthenticated) {
+      throw new Error('Потрібна авторизація')
+    }
+
+    return apiRequest(
+      '/api/menu-plan',
+      {
+        method: 'POST',
+        body: JSON.stringify({ dishId, menuDate }),
+      },
+      authToken,
+    )
+  }
+
+  const handleRemoveDishFromMenu = async (menuEntryId) => {
+    return apiRequest(
+      `/api/menu-plan/${menuEntryId}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+  }
+
   const openAddCategoryModal = () => {
     if (!isAdmin) {
       return
@@ -331,6 +361,16 @@ function App() {
               onUpdateDish={handleUpdateDish}
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
+              onScheduleDishToMenu={handleScheduleDishToMenu}
+            />
+          )}
+        />
+        <Route
+          path="/menu"
+          element={protectedContent(
+            <MenuPage
+              onLoadMenuEntries={handleGetMenuEntriesByDate}
+              onRemoveMenuEntry={handleRemoveDishFromMenu}
             />
           )}
         />

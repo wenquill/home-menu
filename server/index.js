@@ -6,10 +6,13 @@ import {
   createUser,
   createCategory,
   createDish,
+  createMenuEntry,
   deleteDish,
+  deleteMenuEntryById,
   getDishById,
   getCategories,
   getCategoryById,
+  getMenuEntriesByDate,
   getDishes,
   getUserByEmail,
   getUserById,
@@ -367,6 +370,64 @@ app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
     return res.json({ success: true })
   } catch (_error) {
     return res.status(500).json({ message: 'Не вдалося видалити страву' })
+  }
+})
+
+app.get('/api/menu-plan', authRequired, (req, res) => {
+  const menuDate = String(req.query.date || '').trim()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
+    return res.status(400).json({ message: 'date має бути у форматі YYYY-MM-DD' })
+  }
+
+  try {
+    return res.json(getMenuEntriesByDate(menuDate))
+  } catch (error) {
+    return res.status(400).json({ message: error.message })
+  }
+})
+
+app.post('/api/menu-plan', authRequired, (req, res) => {
+  const dishId = Number(req.body.dishId)
+  const menuDate = String(req.body.menuDate || '').trim()
+
+  if (Number.isNaN(dishId)) {
+    return res.status(400).json({ message: 'dishId має бути числом' })
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
+    return res.status(400).json({ message: 'menuDate має бути у форматі YYYY-MM-DD' })
+  }
+
+  try {
+    const menuEntry = createMenuEntry({ dishId, menuDate })
+    return res.status(201).json(menuEntry)
+  } catch (error) {
+    if (String(error.message).includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ message: 'Цю страву вже додано до меню на цю дату' })
+    }
+
+    return res.status(400).json({ message: error.message })
+  }
+})
+
+app.delete('/api/menu-plan/:id', authRequired, (req, res) => {
+  const menuEntryId = Number(req.params.id)
+
+  if (Number.isNaN(menuEntryId)) {
+    return res.status(400).json({ message: 'Некоректний id елемента меню' })
+  }
+
+  try {
+    const deleted = deleteMenuEntryById(menuEntryId)
+
+    if (!deleted) {
+      return res.status(404).json({ message: 'Елемент меню не знайдено' })
+    }
+
+    return res.json({ success: true })
+  } catch (_error) {
+    return res.status(500).json({ message: 'Не вдалося прибрати страву з меню' })
   }
 })
 

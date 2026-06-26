@@ -47,6 +47,9 @@ export default function TopMenu({
                 <NavLink to="/" className={linkClass}>
                   Страви
                 </NavLink>
+                <NavLink to="/menu" className={linkClass}>
+                  Меню
+                </NavLink>
                 <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
                   вийти
                 </button>

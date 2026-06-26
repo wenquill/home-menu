@@ -343,6 +343,53 @@ body {
   color: #2f2f2f;
 }
 
+.dish-card-categories {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.dish-card-categories-label,
+.dish-card-categories-separator {
+  color: #8a8a8a;
+}
+
+.dish-card-categories span:not(.dish-card-categories-label):not(.dish-card-categories-separator) {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #2f2f2f;
+}
+
+.dish-add-to-menu-button {
+  margin-top: 12px;
+  width: 100%;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dish-add-to-menu-button:hover {
+  opacity: 0.94;
+}
+
+.dish-remove-from-menu-button {
+  background: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-text);
+}
+
 .dish-modal-overlay {
   position: fixed;
   inset: 0;
@@ -380,6 +427,10 @@ body {
 
 .dish-modal--confirm {
   width: min(420px, 100%);
+}
+
+.dish-modal--schedule {
+  width: min(520px, 100%);
 }
 
 .dish-modal h2 {
@@ -436,6 +487,63 @@ body {
   font: inherit;
   color: var(--text);
   line-height: 1.45;
+}
+
+.menu-schedule-options {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.menu-schedule-option {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.menu-schedule-option--active {
+  border-color: var(--btn-border);
+  background: #fff5bf;
+}
+
+.menu-schedule-custom {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.menu-schedule-form {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-schedule-form input {
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.menu-schedule-form button {
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.menu-schedule-toast {
+  margin-top: 12px;
 }
 
 .dish-copy-message {
@@ -641,6 +749,37 @@ body {
 
 .admin-form-actions button {
   width: auto;
+}
+
+.menu-page {
+  padding-bottom: 28px;
+}
+
+.menu-page-header {
+  margin: 2px 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.menu-date-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.menu-date-picker {
+  width: min(240px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.dish-card--menu-item {
+  cursor: default;
 }
 
 .component-list {

@@ -103,6 +103,24 @@ function replaceDishComponents(dishId, components) {
   })
 }
 
+function normalizeMenuDate(menuDate) {
+  const value = String(menuDate || '').trim()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error('Некоректна дата меню')
+  }
+
+  return value
+}
+
+function getMenuPlannedDishIdsByDate(menuDate) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+
+  return db
+    .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE menu_date = ? ORDER BY id DESC')
+    .all(normalizedDate)
+}
+
 function seedCategories() {
   const mealCategories = ['Сніданки', 'Обіди', 'Вечері', 'Перекуси', 'Інше']
   const typeCategories = ['Закуски', 'Салати', 'Гарнір', 'Основне', 'Десерти']
@@ -232,10 +250,20 @@ export function initializeDatabase() {
       FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS menu_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dish_id INTEGER NOT NULL,
+      menu_date TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+      UNIQUE(dish_id, menu_date)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_categories_kind ON categories(kind);
     CREATE INDEX IF NOT EXISTS idx_dishes_meal_category ON dishes(meal_category_id);
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
     CREATE INDEX IF NOT EXISTS idx_dish_components_dish ON dish_components(dish_id);
+    CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -251,6 +279,23 @@ export function initializeDatabase() {
 
   if (!hasRecipeColumn) {
     db.exec("ALTER TABLE dishes ADD COLUMN recipe TEXT NOT NULL DEFAULT ''")
+  }
+
+  const menuEntryColumns = db.prepare("PRAGMA table_info('menu_entries')").all()
+  const hasMenuEntryTable = menuEntryColumns.length > 0
+
+  if (!hasMenuEntryTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS menu_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dish_id INTEGER NOT NULL,
+        menu_date TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
+        UNIQUE(dish_id, menu_date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
+    `)
   }
 
   const adminCount = db
@@ -407,6 +452,56 @@ export function updateDish({ id, title, description, recipe = '', mealCategoryId
 export function deleteDish(id) {
   const result = db.prepare('DELETE FROM dishes WHERE id = ?').run(id)
   return result.changes > 0
+}
+
+export function createMenuEntry({ dishId, menuDate }) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+  const existingDish = getDishById(dishId)
+
+  if (!existingDish) {
+    throw new Error('Страву не знайдено')
+  }
+
+  const result = db
+    .prepare('INSERT INTO menu_entries (dish_id, menu_date) VALUES (?, ?)')
+    .run(dishId, normalizedDate)
+
+  return db
+    .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE id = ?')
+    .get(result.lastInsertRowid)
+}
+
+export function deleteMenuEntryById(id) {
+  const result = db.prepare('DELETE FROM menu_entries WHERE id = ?').run(id)
+  return result.changes > 0
+}
+
+export function getMenuEntriesByDate(menuDate) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+
+  const menuEntries = db
+    .prepare(
+      `SELECT
+        me.id AS menuEntryId,
+        me.menu_date AS menuDate,
+        d.id,
+        d.title,
+        d.description,
+        d.recipe,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM menu_entries me
+       JOIN dishes d ON d.id = me.dish_id
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE me.menu_date = ?
+       ORDER BY me.id DESC`,
+    )
+    .all(normalizedDate)
+
+  return attachDishComponents(menuEntries)
 }
 
 export function getUserByEmail(email) {
