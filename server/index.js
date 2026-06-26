@@ -13,6 +13,7 @@ import {
   getUserByEmail,
   getUserById,
   initializeDatabase,
+  updateUserById,
   updateDish,
 } from './db.js'
 
@@ -114,6 +115,68 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', authRequired, (req, res) => {
   return res.json(req.user)
+})
+
+app.put('/api/profile', authRequired, async (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase()
+  const currentPassword = String(req.body.currentPassword || '')
+  const newPassword = String(req.body.newPassword || '')
+  const avatarDataUrl = String(req.body.avatarDataUrl || '').trim()
+
+  if (!email.includes('@')) {
+    return res.status(400).json({ message: 'Вкажіть коректний логін (email)' })
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    return res.status(400).json({ message: 'Новий пароль має бути мінімум 6 символів' })
+  }
+
+  const userWithPassword = getUserByEmail(req.user.email)
+
+  if (!userWithPassword) {
+    return res.status(404).json({ message: 'Користувача не знайдено' })
+  }
+
+  const isEmailChanged = email !== userWithPassword.email
+  const isPasswordChanged = Boolean(newPassword)
+
+  if ((isEmailChanged || isPasswordChanged) && !currentPassword) {
+    return res.status(400).json({ message: 'Введіть поточний пароль для змін логіна або пароля' })
+  }
+
+  if (currentPassword) {
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, userWithPassword.passwordHash)
+
+    if (!isCurrentPasswordValid) {
+      return res.status(401).json({ message: 'Поточний пароль невірний' })
+    }
+  }
+
+  const existingUser = getUserByEmail(email)
+  if (existingUser && existingUser.id !== userWithPassword.id) {
+    return res.status(409).json({ message: 'Користувач з таким логіном вже існує' })
+  }
+
+  if (avatarDataUrl && !avatarDataUrl.startsWith('data:image/')) {
+    return res.status(400).json({ message: 'Аватар має бути зображенням' })
+  }
+
+  if (avatarDataUrl.length > 2_000_000) {
+    return res.status(400).json({ message: 'Аватар занадто великий. Спробуйте менше зображення' })
+  }
+
+  const nextPasswordHash = newPassword
+    ? await bcrypt.hash(newPassword, 10)
+    : userWithPassword.passwordHash
+
+  const updatedUser = updateUserById({
+    id: userWithPassword.id,
+    email,
+    passwordHash: nextPasswordHash,
+    avatarUrl: avatarDataUrl,
+  })
+
+  return res.json(updatedUser)
 })
 
 app.get('/api/menu', (_req, res) => {

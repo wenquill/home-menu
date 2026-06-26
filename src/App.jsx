@@ -6,6 +6,7 @@ import AddDishPage from './pages/AddDishPage'
 import AuthPage from './pages/AuthPage'
 import CategoryPage from './pages/CategoryPage'
 import EditDishPage from './pages/EditDishPage'
+import ProfilePage from './pages/ProfilePage'
 
 const emptyMenu = {
   mealCategories: [],
@@ -132,6 +133,20 @@ function App() {
     localStorage.removeItem('authToken')
     setAuthToken('')
     setCurrentUser(null)
+  }
+
+  const handleUpdateProfile = async (payload) => {
+    const updatedUser = await apiRequest(
+      '/api/profile',
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      authToken,
+    )
+
+    setCurrentUser(updatedUser)
+    return updatedUser
   }
 
   const handleAddCategory = async (payload) => {
@@ -275,6 +290,12 @@ function App() {
             ) : (
               <Navigate to="/login" replace />
             )
+          )}
+        />
+        <Route
+          path="/profile"
+          element={protectedContent(
+            <ProfilePage currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />,
           )}
         />
         <Route

@@ -104,6 +104,20 @@ body {
   font-family: inherit;
 }
 
+.menu-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
 .menu-link:active {
   transform: scale(0.97);
 }
@@ -264,6 +278,31 @@ body {
 .auth-alt-link a {
   color: var(--text);
   font-weight: 700;
+}
+
+.profile-avatar-block {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.profile-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 2px solid var(--line);
+}
+
+.avatar-upload-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#avatar-upload {
+  width: 100%;
+  max-width: 320px;
 }
 
 @media (min-width: 640px) {

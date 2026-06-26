@@ -106,6 +106,7 @@ export function initializeDatabase() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('ADMIN', 'USER')),
+      avatar_url TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -133,6 +134,13 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
+
+  const userColumns = db.prepare("PRAGMA table_info('users')").all()
+  const hasAvatarColumn = userColumns.some((column) => column.name === 'avatar_url')
+
+  if (!hasAvatarColumn) {
+    db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''")
+  }
 
   const adminCount = db
     .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN'")
@@ -276,14 +284,29 @@ export function updateDish({ id, title, description, mealCategoryId, typeCategor
 export function getUserByEmail(email) {
   return db
     .prepare(
-      'SELECT id, email, password_hash AS passwordHash, role FROM users WHERE email = ?',
+      `SELECT
+        id,
+        email,
+        password_hash AS passwordHash,
+        role,
+        avatar_url AS avatarUrl
+       FROM users
+       WHERE email = ?`,
     )
     .get(email)
 }
 
 export function getUserById(id) {
   return db
-    .prepare('SELECT id, email, role FROM users WHERE id = ?')
+    .prepare(
+      `SELECT
+        id,
+        email,
+        role,
+        avatar_url AS avatarUrl
+       FROM users
+       WHERE id = ?`,
+    )
     .get(id)
 }
 
@@ -293,4 +316,14 @@ export function createUser({ email, passwordHash, role = 'USER' }) {
     .run(email, passwordHash, role)
 
   return getUserById(result.lastInsertRowid)
+}
+
+export function updateUserById({ id, email, passwordHash, avatarUrl }) {
+  db.prepare(
+    `UPDATE users
+     SET email = ?, password_hash = ?, avatar_url = ?
+     WHERE id = ?`,
+  ).run(email, passwordHash, avatarUrl, id)
+
+  return getUserById(id)
 }

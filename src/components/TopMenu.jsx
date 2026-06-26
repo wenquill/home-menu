@@ -44,9 +44,21 @@ export default function TopMenu({
         ) : null}
 
         {currentUser ? (
-          <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
-            Вийти ({currentUser.role === 'ADMIN' ? 'admin' : 'user'})
-          </button>
+          <>
+            <NavLink to="/profile" className={linkClass}>
+              <span className="menu-profile-link">
+                <img
+                  src={currentUser.avatarUrl || '/avatar-placeholder.svg'}
+                  alt="Аватар"
+                  className="menu-avatar"
+                />
+                Профіль
+              </span>
+            </NavLink>
+            <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
+              Вийти ({currentUser.role === 'ADMIN' ? 'admin' : 'user'})
+            </button>
+          </>
         ) : (
           <>
             <NavLink to="/login" className={linkClass}>
