@@ -147,6 +147,7 @@ export default function CategoryPage({
   const [isSchedulingMenu, setIsSchedulingMenu] = useState(false)
   const [scheduleMessage, setScheduleMessage] = useState('')
   const [scheduleMessageTimeoutId, setScheduleMessageTimeoutId] = useState(null)
+  const [searchText, setSearchText] = useState('')
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -172,8 +173,25 @@ export default function CategoryPage({
   const categoryLabel = isAllDishesView ? 'усі страви' : category?.name || 'меню'
   const dishListAriaLabel = `Страви: ${categoryLabel}`
   const dishKeyPrefix = isAllDishesView ? 'all' : String(selectedCategoryId)
+  const normalizedSearch = searchText.trim().toLowerCase()
 
-  const isEmptyCategory = filteredDishes.length === 0
+  const visibleDishes = normalizedSearch
+    ? filteredDishes.filter((dish) => {
+        const title = String(dish.title || '').toLowerCase()
+        const description = String(dish.description || '').toLowerCase()
+        const components = Array.isArray(dish.components)
+          ? dish.components.join(' ').toLowerCase()
+          : ''
+
+        return (
+          title.includes(normalizedSearch) ||
+          description.includes(normalizedSearch) ||
+          components.includes(normalizedSearch)
+        )
+      })
+    : filteredDishes
+
+  const isEmptyCategory = visibleDishes.length === 0
 
   useEffect(() => {
     if (!selectedDish && !isEditModalOpen && !dishToDelete && !menuScheduleDish) {
@@ -449,13 +467,27 @@ export default function CategoryPage({
     <main className="category-page">
       <h1 className="category-title">{categoryLabel}</h1>
 
+      <div className="dish-search" role="search">
+        <input
+          id="dish-search-input"
+          type="search"
+          placeholder="пошук: назва, опис, компоненти"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+        />
+      </div>
+
       {isEmptyCategory ? (
         <section className="empty-category-state" aria-label={dishListAriaLabel}>
-          <p>Тут поки порожньо. Додайте перші страви у цю категорію.</p>
+          {normalizedSearch ? (
+            <p>За запитом нічого не знайдено. Спробуйте інший текст.</p>
+          ) : (
+            <p>Тут поки порожньо. Додайте перші страви у цю категорію.</p>
+          )}
         </section>
       ) : (
         <section className="dish-grid" aria-label={dishListAriaLabel}>
-          {filteredDishes.map((dish) => (
+          {visibleDishes.map((dish) => (
             <DishCard
               key={`${dishKeyPrefix}-${dish.id}`}
               id={dish.id}
