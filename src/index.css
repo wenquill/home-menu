@@ -324,6 +324,25 @@ body {
   line-height: 1.45;
 }
 
+.dish-card-components {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dish-card-components span {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2f2f2f;
+}
+
 .dish-modal-overlay {
   position: fixed;
   inset: 0;
@@ -376,6 +395,53 @@ body {
 
 .dish-modal-warning {
   margin-top: 12px;
+}
+
+.dish-components-block {
+  margin-top: 12px;
+}
+
+.dish-recipe-block {
+  margin-top: 12px;
+}
+
+.dish-recipe-block p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dish-recipe-block pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.dish-components-block p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dish-components-block ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.dish-components-block li {
+  color: var(--text);
+  font-size: 14px;
 }
 
 .dish-modal-tags {
@@ -555,6 +621,46 @@ body {
 
 .admin-form-actions button {
   width: auto;
+}
+
+.component-list {
+  display: grid;
+  gap: 8px;
+}
+
+.component-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.component-row input {
+  width: 100%;
+}
+
+.component-add-btn,
+.component-remove-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.component-add-btn {
+  width: fit-content;
+  padding: 7px 10px;
+}
+
+.component-remove-btn {
+  min-width: 34px;
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .admin-form button:disabled {

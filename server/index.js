@@ -238,11 +238,28 @@ app.get('/api/dishes', (req, res) => {
   return res.json(getDishes(categoryId))
 })
 
+app.get('/api/dishes/:id', (req, res) => {
+  const dishId = Number(req.params.id)
+
+  if (Number.isNaN(dishId)) {
+    return res.status(400).json({ message: 'Некоректний id страви' })
+  }
+
+  const dish = getDishById(dishId)
+  if (!dish) {
+    return res.status(404).json({ message: 'Страву не знайдено' })
+  }
+
+  return res.json(dish)
+})
+
 app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
+  const recipe = String(req.body.recipe || '').trim()
   const mealCategoryId = Number(req.body.mealCategoryId)
   const typeCategoryId = Number(req.body.typeCategoryId)
+  const components = Array.isArray(req.body.components) ? req.body.components : []
 
   if (!title) {
     return res.status(400).json({ message: 'Назва страви обовʼязкова' })
@@ -267,8 +284,10 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
     const dish = createDish({
       title,
       description,
+      recipe,
       mealCategoryId,
       typeCategoryId,
+      components,
     })
 
     return res.status(201).json(dish)
@@ -281,8 +300,10 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
   const dishId = Number(req.params.id)
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
+  const recipe = String(req.body.recipe || '').trim()
   const mealCategoryId = Number(req.body.mealCategoryId)
   const typeCategoryId = Number(req.body.typeCategoryId)
+  const components = Array.isArray(req.body.components) ? req.body.components : []
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'Некоректний id страви' })
@@ -317,8 +338,10 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
       id: dishId,
       title,
       description,
+      recipe,
       mealCategoryId,
       typeCategoryId,
+      components,
     })
 
     return res.json(dish)

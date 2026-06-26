@@ -28,6 +28,81 @@ function pickRandomDefaultAvatar() {
   return defaultAvatarUrls[randomIndex]
 }
 
+function normalizeDishComponents(components) {
+  if (!Array.isArray(components)) {
+    return []
+  }
+
+  const seen = new Set()
+
+  return components
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase()
+
+      if (seen.has(key)) {
+        return false
+      }
+
+      seen.add(key)
+      return true
+    })
+    .slice(0, 40)
+}
+
+function getDishComponentsByDishIds(dishIds) {
+  if (!dishIds.length) {
+    return new Map()
+  }
+
+  const placeholders = dishIds.map(() => '?').join(', ')
+  const rows = db.prepare(
+    `SELECT dish_id AS dishId, name
+     FROM dish_components
+     WHERE dish_id IN (${placeholders})
+     ORDER BY position ASC, id ASC`,
+  ).all(...dishIds)
+
+  const componentsByDish = new Map()
+
+  for (const row of rows) {
+    const existing = componentsByDish.get(row.dishId) || []
+    existing.push(row.name)
+    componentsByDish.set(row.dishId, existing)
+  }
+
+  return componentsByDish
+}
+
+function attachDishComponents(dishes) {
+  const dishIds = dishes.map((dish) => dish.id)
+  const componentsByDish = getDishComponentsByDishIds(dishIds)
+
+  return dishes.map((dish) => ({
+    ...dish,
+    components: componentsByDish.get(dish.id) || [],
+  }))
+}
+
+function replaceDishComponents(dishId, components) {
+  const normalized = normalizeDishComponents(components)
+
+  db.prepare('DELETE FROM dish_components WHERE dish_id = ?').run(dishId)
+
+  if (!normalized.length) {
+    return
+  }
+
+  const insertComponent = db.prepare(
+    'INSERT INTO dish_components (dish_id, name, position) VALUES (?, ?, ?)',
+  )
+
+  normalized.forEach((name, index) => {
+    insertComponent.run(dishId, name, index)
+  })
+}
+
 function seedCategories() {
   const mealCategories = ['Сніданки', 'Обіди', 'Вечері', 'Перекуси', 'Інше']
   const typeCategories = ['Закуски', 'Салати', 'Гарнір', 'Основне', 'Десерти']
@@ -140,6 +215,7 @@ export function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
+      recipe TEXT NOT NULL DEFAULT '',
       meal_category_id INTEGER NOT NULL,
       type_category_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -147,9 +223,19 @@ export function initializeDatabase() {
       FOREIGN KEY (type_category_id) REFERENCES categories(id) ON DELETE RESTRICT
     );
 
+    CREATE TABLE IF NOT EXISTS dish_components (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dish_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_categories_kind ON categories(kind);
     CREATE INDEX IF NOT EXISTS idx_dishes_meal_category ON dishes(meal_category_id);
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
+    CREATE INDEX IF NOT EXISTS idx_dish_components_dish ON dish_components(dish_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -158,6 +244,13 @@ export function initializeDatabase() {
 
   if (!hasAvatarColumn) {
     db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''")
+  }
+
+  const dishColumns = db.prepare("PRAGMA table_info('dishes')").all()
+  const hasRecipeColumn = dishColumns.some((column) => column.name === 'recipe')
+
+  if (!hasRecipeColumn) {
+    db.exec("ALTER TABLE dishes ADD COLUMN recipe TEXT NOT NULL DEFAULT ''")
   }
 
   const adminCount = db
@@ -207,12 +300,13 @@ export function createCategory({ name, kind }) {
 
 export function getDishes(categoryId) {
   if (categoryId) {
-    return db
+    const dishes = db
       .prepare(
         `SELECT
           d.id,
           d.title,
           d.description,
+          d.recipe,
           d.meal_category_id AS mealCategoryId,
           d.type_category_id AS typeCategoryId,
           meal.name AS mealCategoryName,
@@ -224,14 +318,17 @@ export function getDishes(categoryId) {
          ORDER BY d.id DESC`,
       )
       .all(categoryId, categoryId)
+
+    return attachDishComponents(dishes)
   }
 
-  return db
+  const dishes = db
     .prepare(
       `SELECT
         d.id,
         d.title,
         d.description,
+        d.recipe,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -242,15 +339,18 @@ export function getDishes(categoryId) {
        ORDER BY d.id DESC`,
     )
     .all()
+
+  return attachDishComponents(dishes)
 }
 
 export function getDishById(id) {
-  return db
+  const dish = db
     .prepare(
       `SELECT
         d.id,
         d.title,
         d.description,
+        d.recipe,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -261,40 +361,45 @@ export function getDishById(id) {
        WHERE d.id = ?`,
     )
     .get(id)
+
+  if (!dish) {
+    return null
+  }
+
+  const [dishWithComponents] = attachDishComponents([dish])
+  return dishWithComponents
 }
 
-export function createDish({ title, description, mealCategoryId, typeCategoryId }) {
-  const result = db
-    .prepare(
-      `INSERT INTO dishes (title, description, meal_category_id, type_category_id)
-       VALUES (?, ?, ?, ?)`,
-    )
-    .run(title, description, mealCategoryId, typeCategoryId)
+export function createDish({ title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
+  const transaction = db.transaction(() => {
+    const result = db
+      .prepare(
+        `INSERT INTO dishes (title, description, recipe, meal_category_id, type_category_id)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(title, description, recipe, mealCategoryId, typeCategoryId)
 
-  return db
-    .prepare(
-      `SELECT
-        d.id,
-        d.title,
-        d.description,
-        d.meal_category_id AS mealCategoryId,
-        d.type_category_id AS typeCategoryId,
-        meal.name AS mealCategoryName,
-        type.name AS typeCategoryName
-       FROM dishes d
-       JOIN categories meal ON meal.id = d.meal_category_id
-       JOIN categories type ON type.id = d.type_category_id
-       WHERE d.id = ?`,
-    )
-    .get(result.lastInsertRowid)
+    const dishId = Number(result.lastInsertRowid)
+    replaceDishComponents(dishId, components)
+    return dishId
+  })
+
+  const dishId = transaction()
+  return getDishById(dishId)
 }
 
-export function updateDish({ id, title, description, mealCategoryId, typeCategoryId }) {
-  db.prepare(
-    `UPDATE dishes
-     SET title = ?, description = ?, meal_category_id = ?, type_category_id = ?
-     WHERE id = ?`,
-  ).run(title, description, mealCategoryId, typeCategoryId, id)
+export function updateDish({ id, title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
+  const transaction = db.transaction(() => {
+    db.prepare(
+      `UPDATE dishes
+       SET title = ?, description = ?, recipe = ?, meal_category_id = ?, type_category_id = ?
+       WHERE id = ?`,
+    ).run(title, description, recipe, mealCategoryId, typeCategoryId, id)
+
+    replaceDishComponents(id, components)
+  })
+
+  transaction()
 
   return getDishById(id)
 }

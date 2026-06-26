@@ -12,6 +12,8 @@ export default function AddDishPage({
   const navigate = useNavigate()
   const [dishTitle, setDishTitle] = useState('')
   const [dishDescription, setDishDescription] = useState('')
+  const [dishRecipe, setDishRecipe] = useState('')
+  const [dishComponents, setDishComponents] = useState([''])
   const [mealCategoryId, setMealCategoryId] = useState('')
   const [typeCategoryId, setTypeCategoryId] = useState('')
   const [formMessage, setFormMessage] = useState('')
@@ -38,12 +40,16 @@ export default function AddDishPage({
       await onAddDish({
         title: dishTitle,
         description: dishDescription,
+        recipe: dishRecipe,
+        components: dishComponents,
         mealCategoryId: Number(mealCategoryId),
         typeCategoryId: Number(typeCategoryId),
       })
 
       setDishTitle('')
       setDishDescription('')
+      setDishRecipe('')
+      setDishComponents([''])
 
       if (embedded) {
         onSuccess?.()
@@ -56,6 +62,24 @@ export default function AddDishPage({
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const updateComponentAt = (index, value) => {
+    setDishComponents((prev) => prev.map((item, idx) => (idx === index ? value : item)))
+  }
+
+  const addComponentField = () => {
+    setDishComponents((prev) => [...prev, ''])
+  }
+
+  const removeComponentField = (index) => {
+    setDishComponents((prev) => {
+      if (prev.length === 1) {
+        return ['']
+      }
+
+      return prev.filter((_item, idx) => idx !== index)
+    })
   }
 
   const content = (
@@ -81,6 +105,39 @@ export default function AddDishPage({
             placeholder="Короткий опис страви"
             rows={4}
           />
+
+          <label htmlFor="dish-recipe">рецепт</label>
+          <textarea
+            id="dish-recipe"
+            value={dishRecipe}
+            onChange={(event) => setDishRecipe(event.target.value)}
+            placeholder="кроки приготування"
+            rows={5}
+          />
+
+          <label>компоненти (інгредієнти)</label>
+          <div className="component-list">
+            {dishComponents.map((component, index) => (
+              <div className="component-row" key={`new-component-${index}`}>
+                <input
+                  value={component}
+                  onChange={(event) => updateComponentAt(index, event.target.value)}
+                  placeholder="наприклад, авокадо"
+                />
+                <button
+                  type="button"
+                  className="component-remove-btn"
+                  onClick={() => removeComponentField(index)}
+                  aria-label="видалити компонент"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button type="button" className="component-add-btn" onClick={addComponentField}>
+              + додати компонент
+            </button>
+          </div>
 
           <label htmlFor="meal-category">Категорія за часом дня</label>
           <select

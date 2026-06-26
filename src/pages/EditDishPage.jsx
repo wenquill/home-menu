@@ -16,6 +16,8 @@ export default function EditDishPage({
 
   const [dishTitle, setDishTitle] = useState('')
   const [dishDescription, setDishDescription] = useState('')
+  const [dishRecipe, setDishRecipe] = useState('')
+  const [dishComponents, setDishComponents] = useState([''])
   const [mealCategoryId, setMealCategoryId] = useState('')
   const [typeCategoryId, setTypeCategoryId] = useState('')
   const [formMessage, setFormMessage] = useState('')
@@ -29,9 +31,29 @@ export default function EditDishPage({
 
     setDishTitle(dish.title)
     setDishDescription(dish.description)
+    setDishRecipe(dish.recipe || '')
+    setDishComponents(dish.components?.length ? dish.components : [''])
     setMealCategoryId(String(dish.mealCategoryId))
     setTypeCategoryId(String(dish.typeCategoryId))
   }, [dish])
+
+  const updateComponentAt = (index, value) => {
+    setDishComponents((prev) => prev.map((item, idx) => (idx === index ? value : item)))
+  }
+
+  const addComponentField = () => {
+    setDishComponents((prev) => [...prev, ''])
+  }
+
+  const removeComponentField = (index) => {
+    setDishComponents((prev) => {
+      if (prev.length === 1) {
+        return ['']
+      }
+
+      return prev.filter((_item, idx) => idx !== index)
+    })
+  }
 
   if (!isAdmin) {
     return <Navigate to="/login" replace />
@@ -56,6 +78,8 @@ export default function EditDishPage({
         id: dish.id,
         title: dishTitle,
         description: dishDescription,
+        recipe: dishRecipe,
+        components: dishComponents,
         mealCategoryId: Number(mealCategoryId),
         typeCategoryId: Number(typeCategoryId),
       })
@@ -91,6 +115,38 @@ export default function EditDishPage({
             onChange={(event) => setDishDescription(event.target.value)}
           />
 
+          <label htmlFor="edit-recipe">рецепт</label>
+          <textarea
+            id="edit-recipe"
+            rows={5}
+            value={dishRecipe}
+            onChange={(event) => setDishRecipe(event.target.value)}
+          />
+
+          <label>компоненти (інгредієнти)</label>
+          <div className="component-list">
+            {dishComponents.map((component, index) => (
+              <div className="component-row" key={`route-edit-component-${index}`}>
+                <input
+                  value={component}
+                  onChange={(event) => updateComponentAt(index, event.target.value)}
+                  placeholder="наприклад, авокадо"
+                />
+                <button
+                  type="button"
+                  className="component-remove-btn"
+                  onClick={() => removeComponentField(index)}
+                  aria-label="видалити компонент"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button type="button" className="component-add-btn" onClick={addComponentField}>
+              + додати компонент
+            </button>
+          </div>
+
           <label htmlFor="edit-meal-category">Категорія за часом дня</label>
           <select
             id="edit-meal-category"
@@ -100,7 +156,7 @@ export default function EditDishPage({
           >
             {mealCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.name.toLowerCase()}
               </option>
             ))}
           </select>
@@ -114,13 +170,13 @@ export default function EditDishPage({
           >
             {typeCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.name.toLowerCase()}
               </option>
             ))}
           </select>
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Зберігаю...' : 'Оновити страву'}
+            {isSubmitting ? 'зберігаю...' : 'оновити страву'}
           </button>
         </form>
 

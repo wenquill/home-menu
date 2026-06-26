@@ -244,6 +244,10 @@ function App() {
     await loadMenuData({ background: true })
   }
 
+  const handleGetDishById = async (id) => {
+    return apiRequest(`/api/dishes/${id}`, {}, authToken)
+  }
+
   const openAddCategoryModal = () => {
     if (!isAdmin) {
       return
@@ -326,6 +330,7 @@ function App() {
               isAdmin={isAdmin}
               onUpdateDish={handleUpdateDish}
               onDeleteDish={handleDeleteDish}
+              onGetDishById={handleGetDishById}
             />
           )}
         />

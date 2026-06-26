@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 
-function DishCard({ id, title, description, isAdmin, onOpen, onEdit, onDelete }) {
+function DishCard({ id, title, description, components, isAdmin, onOpen, onEdit, onDelete }) {
   const cornerOffsets = [
     { x: '10%', y: '10%' },
     { x: '90%', y: '10%' },
@@ -69,6 +69,13 @@ function DishCard({ id, title, description, isAdmin, onOpen, onEdit, onDelete })
         ) : null}
       </div>
       <p>{description}</p>
+      {components?.length ? (
+        <div className="dish-card-components" aria-label="компоненти страви">
+          {components.map((component, index) => (
+            <span key={`${id}-card-component-${index}`}>{component}</span>
+          ))}
+        </div>
+      ) : null}
     </article>
   )
 }
@@ -81,6 +88,7 @@ export default function CategoryPage({
   isAdmin,
   onUpdateDish,
   onDeleteDish,
+  onGetDishById,
 }) {
   const { categoryId } = useParams()
   const selectedCategoryId = Number(categoryId)
@@ -88,6 +96,8 @@ export default function CategoryPage({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [editRecipe, setEditRecipe] = useState('')
+  const [editComponents, setEditComponents] = useState([''])
   const [editMealCategoryId, setEditMealCategoryId] = useState('')
   const [editTypeCategoryId, setEditTypeCategoryId] = useState('')
   const [editError, setEditError] = useState('')
@@ -143,14 +153,55 @@ export default function CategoryPage({
     setDeleteError('')
   }
 
-  const openEditModal = (dish) => {
+  const loadDishDetails = async (dish) => {
+    if (!dish || !onGetDishById) {
+      return dish
+    }
+
+    try {
+      const detailedDish = await onGetDishById(dish.id)
+      return detailedDish || dish
+    } catch (_error) {
+      return dish
+    }
+  }
+
+  const openDishModal = async (dish) => {
     setSelectedDish(dish)
-    setEditTitle(dish.title)
-    setEditDescription(dish.description || '')
-    setEditMealCategoryId(String(dish.mealCategoryId))
-    setEditTypeCategoryId(String(dish.typeCategoryId))
+    const detailedDish = await loadDishDetails(dish)
+    setSelectedDish(detailedDish)
+  }
+
+  const openEditModal = async (dish) => {
+    const detailedDish = await loadDishDetails(dish)
+
+    setSelectedDish(detailedDish)
+    setEditTitle(detailedDish.title)
+    setEditDescription(detailedDish.description || '')
+    setEditRecipe(detailedDish.recipe || '')
+    setEditComponents(detailedDish.components?.length ? detailedDish.components : [''])
+    setEditMealCategoryId(String(detailedDish.mealCategoryId))
+    setEditTypeCategoryId(String(detailedDish.typeCategoryId))
     setEditError('')
     setIsEditModalOpen(true)
+  }
+
+  const updateEditComponentAt = (index, value) => {
+    setEditComponents((prev) => prev.map((item, idx) => (idx === index ? value : item)))
+  }
+
+  const addEditComponentField = () => {
+    setEditComponents((prev) => [...prev, ''])
+  }
+
+  const removeEditComponentField = (index) => {
+    setEditComponents((prev) => {
+      if (prev.length === 1) {
+        return ['']
+      }
+
+      return prev.filter((_item, idx) => idx !== index)
+    })
   }
 
   const submitEdit = async (event) => {
@@ -168,6 +219,8 @@ export default function CategoryPage({
         id: selectedDish.id,
         title: editTitle,
         description: editDescription,
+        recipe: editRecipe,
+        components: editComponents,
         mealCategoryId: Number(editMealCategoryId),
         typeCategoryId: Number(editTypeCategoryId),
       })
@@ -223,9 +276,14 @@ export default function CategoryPage({
               id={dish.id}
               title={dish.title}
               description={dish.description}
+              components={dish.components}
               isAdmin={isAdmin}
-              onOpen={() => setSelectedDish(dish)}
-              onEdit={() => openEditModal(dish)}
+              onOpen={() => {
+                void openDishModal(dish)
+              }}
+              onEdit={() => {
+                void openEditModal(dish)
+              }}
               onDelete={() => openDeleteModal(dish)}
             />
           ))}
@@ -255,6 +313,22 @@ export default function CategoryPage({
             </button>
             <h2>{selectedDish.title}</h2>
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
+            {selectedDish.recipe ? (
+              <div className="dish-recipe-block">
+                <p>рецепт:</p>
+                <pre>{selectedDish.recipe}</pre>
+              </div>
+            ) : null}
+            {selectedDish.components?.length ? (
+              <div className="dish-components-block">
+                <p>компоненти:</p>
+                <ul>
+                  {selectedDish.components.map((component, index) => (
+                    <li key={`${selectedDish.id}-component-${index}`}>{component}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <div className="dish-modal-tags">
               <span>{selectedDish.mealCategoryName}</span>
               <span>{selectedDish.typeCategoryName}</span>
@@ -299,6 +373,38 @@ export default function CategoryPage({
                 value={editDescription}
                 onChange={(event) => setEditDescription(event.target.value)}
               />
+
+              <label htmlFor="edit-dish-recipe">рецепт</label>
+              <textarea
+                id="edit-dish-recipe"
+                rows={5}
+                value={editRecipe}
+                onChange={(event) => setEditRecipe(event.target.value)}
+              />
+
+              <label>компоненти (інгредієнти)</label>
+              <div className="component-list">
+                {editComponents.map((component, index) => (
+                  <div className="component-row" key={`modal-edit-component-${index}`}>
+                    <input
+                      value={component}
+                      onChange={(event) => updateEditComponentAt(index, event.target.value)}
+                      placeholder="наприклад, авокадо"
+                    />
+                    <button
+                      type="button"
+                      className="component-remove-btn"
+                      onClick={() => removeEditComponentField(index)}
+                      aria-label="видалити компонент"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="component-add-btn" onClick={addEditComponentField}>
+                  + додати компонент
+                </button>
+              </div>
 
               <label htmlFor="edit-dish-meal-category">категорія за часом дня</label>
               <select
