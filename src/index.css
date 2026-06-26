@@ -55,13 +55,14 @@ body {
 }
 
 .top-menu--strip {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   padding: 8px 10px;
 }
 
 .top-menu--categories {
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  position: static;
 }
 
 .menu-actions {
@@ -1195,7 +1196,7 @@ body {
   }
 
   .top-menu--categories {
-    top: 0;
+    position: static;
   }
 
   .menu-actions {
