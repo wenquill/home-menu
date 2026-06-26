@@ -28,6 +28,12 @@ function pickRandomDefaultAvatar() {
   return defaultAvatarUrls[randomIndex]
 }
 
+function buildDefaultDisplayNameFromEmail(email) {
+  const value = String(email || '').trim().toLowerCase()
+  const localPart = value.split('@')[0] || 'user'
+  return localPart.slice(0, 40)
+}
+
 function normalizeDishComponents(components) {
   if (!Array.isArray(components)) {
     return []
@@ -148,6 +154,7 @@ function getActivityLogRowsForUser(userId, limit = 50) {
         l.id,
         l.actor_user_id AS actorUserId,
         l.actor_email AS actorEmail,
+        u.display_name AS actorDisplayName,
         l.action,
         l.message,
         l.details_json AS detailsJson,
@@ -157,6 +164,8 @@ function getActivityLogRowsForUser(userId, limit = 50) {
           ELSE 0
         END AS isRead
        FROM activity_logs l
+       LEFT JOIN users u
+         ON u.id = l.actor_user_id
        LEFT JOIN activity_log_reads r
          ON r.activity_log_id = l.id
         AND r.user_id = ?
@@ -164,11 +173,22 @@ function getActivityLogRowsForUser(userId, limit = 50) {
        LIMIT ?`,
     )
     .all(userId, userId, limit)
-    .map((row) => ({
-      ...row,
-      details: parseActivityLogDetails(row.detailsJson),
-      isRead: Boolean(row.isRead),
-    }))
+    .map((row) => {
+      const actorName = String(row.actorDisplayName || '').trim() || row.actorEmail
+      const originalMessage = String(row.message || '')
+      const normalizedMessage =
+        actorName && row.actorEmail && originalMessage.startsWith(`${row.actorEmail} `)
+          ? `${actorName}${originalMessage.slice(row.actorEmail.length)}`
+          : originalMessage
+
+      return {
+        ...row,
+        actorDisplayName: actorName,
+        message: normalizedMessage,
+        details: parseActivityLogDetails(row.detailsJson),
+        isRead: Boolean(row.isRead),
+      }
+    })
 }
 
 function seedCategories() {
@@ -251,13 +271,14 @@ function seedDishes() {
 function seedAdminUser() {
   const adminEmail = String(process.env.ADMIN_EMAIL || 'admin@home.menu').trim().toLowerCase()
   const adminPasswordHash = String(process.env.ADMIN_PASSWORD_HASH || '').trim()
+  const adminDisplayName = buildDefaultDisplayNameFromEmail(adminEmail)
 
   // Fallback password is admin123 for local development only.
   const fallbackPasswordHash = bcrypt.hashSync('admin123', 10)
 
   db.prepare(
-    'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
-  ).run(adminEmail, adminPasswordHash || fallbackPasswordHash, 'ADMIN')
+    'INSERT INTO users (email, display_name, password_hash, role) VALUES (?, ?, ?, ?)',
+  ).run(adminEmail, adminDisplayName, adminPasswordHash || fallbackPasswordHash, 'ADMIN')
 }
 
 export function initializeDatabase() {
@@ -265,6 +286,7 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL UNIQUE,
+      display_name TEXT NOT NULL DEFAULT '',
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('ADMIN', 'USER')),
       avatar_url TEXT NOT NULL DEFAULT '',
@@ -341,10 +363,22 @@ export function initializeDatabase() {
 
   const userColumns = db.prepare("PRAGMA table_info('users')").all()
   const hasAvatarColumn = userColumns.some((column) => column.name === 'avatar_url')
+  const hasDisplayNameColumn = userColumns.some((column) => column.name === 'display_name')
 
   if (!hasAvatarColumn) {
     db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''")
   }
+
+  if (!hasDisplayNameColumn) {
+    db.exec("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''")
+  }
+
+  db.prepare(
+    `UPDATE users
+     SET display_name = SUBSTR(email, 1, INSTR(email, '@') - 1)
+     WHERE TRIM(display_name) = ''
+       AND INSTR(email, '@') > 1`,
+  ).run()
 
   const dishColumns = db.prepare("PRAGMA table_info('dishes')").all()
   const hasRecipeColumn = dishColumns.some((column) => column.name === 'recipe')
@@ -648,6 +682,7 @@ export function getUserByEmail(email) {
       `SELECT
         id,
         email,
+        display_name AS displayName,
         password_hash AS passwordHash,
         role,
         avatar_url AS avatarUrl
@@ -663,6 +698,7 @@ export function getUserById(id) {
       `SELECT
         id,
         email,
+        display_name AS displayName,
         role,
         avatar_url AS avatarUrl
        FROM users
@@ -671,22 +707,25 @@ export function getUserById(id) {
     .get(id)
 }
 
-export function createUser({ email, passwordHash, role = 'USER' }) {
+export function createUser({ email, displayName = '', passwordHash, role = 'USER' }) {
   const avatarUrl = pickRandomDefaultAvatar()
+  const normalizedDisplayName = String(displayName || '').trim() || buildDefaultDisplayNameFromEmail(email)
 
   const result = db
-    .prepare('INSERT INTO users (email, password_hash, role, avatar_url) VALUES (?, ?, ?, ?)')
-    .run(email, passwordHash, role, avatarUrl)
+    .prepare('INSERT INTO users (email, display_name, password_hash, role, avatar_url) VALUES (?, ?, ?, ?, ?)')
+    .run(email, normalizedDisplayName, passwordHash, role, avatarUrl)
 
   return getUserById(result.lastInsertRowid)
 }
 
-export function updateUserById({ id, email, passwordHash, avatarUrl }) {
+export function updateUserById({ id, email, displayName, passwordHash, avatarUrl }) {
+  const normalizedDisplayName = String(displayName || '').trim() || buildDefaultDisplayNameFromEmail(email)
+
   db.prepare(
     `UPDATE users
-     SET email = ?, password_hash = ?, avatar_url = ?
+     SET email = ?, display_name = ?, password_hash = ?, avatar_url = ?
      WHERE id = ?`,
-  ).run(email, passwordHash, avatarUrl, id)
+  ).run(email, normalizedDisplayName, passwordHash, avatarUrl, id)
 
   return getUserById(id)
 }

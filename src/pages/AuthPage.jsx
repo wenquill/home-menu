@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 export default function AuthPage({ mode, onSubmitAuth }) {
   const navigate = useNavigate()
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState('')
@@ -15,8 +16,19 @@ export default function AuthPage({ mode, onSubmitAuth }) {
     setFormError('')
     setIsSubmitting(true)
 
+    if (isRegister && !displayName.trim()) {
+      setFormError('Вкажіть імʼя користувача')
+      setIsSubmitting(false)
+      return
+    }
+
     try {
-      await onSubmitAuth({ email, password, mode })
+      await onSubmitAuth({
+        email,
+        password,
+        displayName: displayName.trim(),
+        mode,
+      })
       navigate('/')
     } catch (error) {
       setFormError(error.message)
@@ -31,6 +43,21 @@ export default function AuthPage({ mode, onSubmitAuth }) {
 
       <section className="admin-panel" aria-label="Форма авторизації">
         <form className="admin-form" onSubmit={submit}>
+          {isRegister ? (
+            <>
+              <label htmlFor="auth-display-name">Імʼя</label>
+              <input
+                id="auth-display-name"
+                type="text"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Ваше імʼя"
+                maxLength={60}
+                required
+              />
+            </>
+          ) : null}
+
           <label htmlFor="auth-email">Email</label>
           <input
             id="auth-email"

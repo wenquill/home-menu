@@ -14,6 +14,7 @@ const defaultAvatarUrls = [
 ]
 
 export default function ProfilePage({ currentUser, onUpdateProfile }) {
+  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -28,6 +29,7 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
       return
     }
 
+    setDisplayName(currentUser.displayName || '')
     setEmail(currentUser.email || '')
     setAvatarDataUrl(currentUser.avatarUrl || '')
   }, [currentUser])
@@ -64,10 +66,16 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
       return
     }
 
+    if (!displayName.trim()) {
+      setFormError('Імʼя користувача обовʼязкове')
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
       const updatedUser = await onUpdateProfile({
+        displayName: displayName.trim(),
         email,
         currentPassword,
         newPassword,
@@ -77,6 +85,7 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
+      setDisplayName(updatedUser.displayName || '')
       setEmail(updatedUser.email)
       setAvatarDataUrl(updatedUser.avatarUrl || '')
       setFormMessage('Профіль успішно оновлено')
@@ -127,6 +136,16 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
               onChange={onAvatarChange}
             />
           </div>
+
+          <label htmlFor="profile-display-name">Імʼя для відображення</label>
+          <input
+            id="profile-display-name"
+            type="text"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            maxLength={60}
+            required
+          />
 
           <label htmlFor="profile-email">Логін (email)</label>
           <input

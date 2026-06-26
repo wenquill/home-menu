@@ -129,13 +129,17 @@ function App() {
     loadMenuData()
   }, [authReady, isAuthenticated, authToken])
 
-  const handleAuthSubmit = async ({ email, password, mode }) => {
+  const handleAuthSubmit = async ({ email, password, displayName, mode }) => {
     const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login'
+    const payload = mode === 'register'
+      ? { email, password, displayName }
+      : { email, password }
+
     const data = await apiRequest(
       endpoint,
       {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       },
       authToken,
     )

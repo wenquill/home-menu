@@ -103,7 +103,16 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/auth/register', async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase()
+  const displayName = String(req.body.displayName || '').trim()
   const password = String(req.body.password || '')
+
+  if (!displayName) {
+    return res.status(400).json({ message: 'Вкажіть імʼя користувача' })
+  }
+
+  if (displayName.length > 60) {
+    return res.status(400).json({ message: 'Імʼя має бути не довшим за 60 символів' })
+  }
 
   if (!email.includes('@')) {
     return res.status(400).json({ message: 'Вкажіть коректний email' })
@@ -119,7 +128,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10)
-  const user = createUser({ email, passwordHash, role: 'USER' })
+  const user = createUser({ email, displayName, passwordHash, role: 'USER' })
   const token = signUserToken(user)
 
   return res.status(201).json({ token, user })
@@ -140,7 +149,13 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ message: 'Невірний email або пароль' })
   }
 
-  const authUser = { id: user.id, email: user.email, role: user.role }
+  const authUser = {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+  }
   const token = signUserToken(authUser)
 
   return res.json({ token, user: authUser })
@@ -152,6 +167,7 @@ app.get('/api/auth/me', authRequired, (req, res) => {
 
 app.put('/api/profile', authRequired, async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase()
+  const displayName = String(req.body.displayName || '').trim()
   const currentPassword = String(req.body.currentPassword || '')
   const newPassword = String(req.body.newPassword || '')
   const avatarDataUrl = String(req.body.avatarDataUrl || '').trim()
@@ -160,6 +176,14 @@ app.put('/api/profile', authRequired, async (req, res) => {
 
   if (!email.includes('@')) {
     return res.status(400).json({ message: 'Вкажіть коректний логін (email)' })
+  }
+
+  if (!displayName) {
+    return res.status(400).json({ message: 'Імʼя користувача обовʼязкове' })
+  }
+
+  if (displayName.length > 60) {
+    return res.status(400).json({ message: 'Імʼя має бути не довшим за 60 символів' })
   }
 
   if (newPassword && newPassword.length < 6) {
@@ -207,6 +231,7 @@ app.put('/api/profile', authRequired, async (req, res) => {
   const updatedUser = updateUserById({
     id: userWithPassword.id,
     email,
+    displayName,
     passwordHash: nextPasswordHash,
     avatarUrl: avatarDataUrl,
   })
@@ -272,12 +297,13 @@ app.post('/api/categories', authRequired, adminRequired, (req, res) => {
 
   try {
     const category = createCategory({ name, kind })
+    const actorName = req.user.displayName || req.user.email
 
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
       action: 'CATEGORY_CREATED',
-      message: `${req.user.email} створив(ла) нову категорію \"${category.name}\"`,
+      message: `${actorName} створив(ла) нову категорію \"${category.name}\"`,
       details: {
         categoryId: category.id,
         categoryName: category.name,
@@ -356,12 +382,13 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
       typeCategoryId,
       components,
     })
+    const actorName = req.user.displayName || req.user.email
 
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
       action: 'DISH_CREATED',
-      message: `${req.user.email} створив(ла) нову страву \"${dish.title}\"`,
+      message: `${actorName} створив(ла) нову страву \"${dish.title}\"`,
       details: {
         dishId: dish.id,
         dishTitle: dish.title,
@@ -374,7 +401,7 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
         actorUserId: req.user.id,
         actorEmail: req.user.email,
         action: 'DISH_COMPONENT_ADDED',
-        message: `${req.user.email} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
+        message: `${actorName} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
         details: {
           dishId: dish.id,
           dishTitle: dish.title,
@@ -436,12 +463,13 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
       typeCategoryId,
       components,
     })
+    const actorName = req.user.displayName || req.user.email
 
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
       action: 'DISH_UPDATED',
-      message: `${req.user.email} редагував(ла) страву \"${dish.title}\"`,
+      message: `${actorName} редагував(ла) страву \"${dish.title}\"`,
       details: {
         dishId: dish.id,
         dishTitle: dish.title,
@@ -456,7 +484,7 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
         actorUserId: req.user.id,
         actorEmail: req.user.email,
         action: 'DISH_COMPONENT_ADDED',
-        message: `${req.user.email} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
+        message: `${actorName} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
         details: {
           dishId: dish.id,
           dishTitle: dish.title,
@@ -470,7 +498,7 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
         actorUserId: req.user.id,
         actorEmail: req.user.email,
         action: 'DISH_COMPONENT_REMOVED',
-        message: `${req.user.email} видалив(ла) компонент \"${componentName}\" зі страви \"${dish.title}\"`,
+        message: `${actorName} видалив(ла) компонент \"${componentName}\" зі страви \"${dish.title}\"`,
         details: {
           dishId: dish.id,
           dishTitle: dish.title,
@@ -499,12 +527,13 @@ app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
 
   try {
     deleteDish(dishId)
+    const actorName = req.user.displayName || req.user.email
 
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
       action: 'DISH_DELETED',
-      message: `${req.user.email} видалив(ла) страву \"${existingDish.title}\"`,
+      message: `${actorName} видалив(ла) страву \"${existingDish.title}\"`,
       details: {
         dishId,
         dishTitle: existingDish.title,
@@ -545,6 +574,7 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
 
   try {
     const menuEntry = createMenuEntry({ dishId, menuDate })
+    const actorName = req.user.displayName || req.user.email
 
     const dish = getDishById(dishId)
     if (dish) {
@@ -552,7 +582,7 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
         actorUserId: req.user.id,
         actorEmail: req.user.email,
         action: 'MENU_ENTRY_ADDED',
-        message: `${req.user.email} додав(ла) до меню на ${menuDate} страву \"${dish.title}\"`,
+        message: `${actorName} додав(ла) до меню на ${menuDate} страву \"${dish.title}\"`,
         details: {
           menuEntryId: menuEntry.id,
           menuDate,
@@ -588,11 +618,12 @@ app.delete('/api/menu-plan/:id', authRequired, (req, res) => {
     }
 
     if (menuEntry) {
+      const actorName = req.user.displayName || req.user.email
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
         action: 'MENU_ENTRY_REMOVED',
-        message: `${req.user.email} прибрав(ла) з меню на ${menuEntry.menuDate} страву \"${menuEntry.title}\"`,
+        message: `${actorName} прибрав(ла) з меню на ${menuEntry.menuDate} страву \"${menuEntry.title}\"`,
         details: {
           menuEntryId,
           menuDate: menuEntry.menuDate,
