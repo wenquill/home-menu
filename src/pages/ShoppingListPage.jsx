@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 function sortItems(items) {
   return [...items].sort((a, b) => {
@@ -32,7 +32,9 @@ export default function ShoppingListPage({
   const [activeToggleId, setActiveToggleId] = useState(null)
   const [newItemText, setNewItemText] = useState('')
   const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
+  const [showThanksOverlay, setShowThanksOverlay] = useState(false)
+  const wasAllCheckedRef = useRef(false)
+  const thanksTimeoutRef = useRef(null)
 
   const visibleItems = useMemo(() => sortItems(items), [items])
 
@@ -54,10 +56,45 @@ export default function ShoppingListPage({
     void loadItems()
   }, [onLoadShoppingList])
 
+  useEffect(() => {
+    const hasItems = visibleItems.length > 0
+    const isAllChecked = hasItems && visibleItems.every((item) => Boolean(item.isChecked))
+
+    if (isAllChecked && !wasAllCheckedRef.current) {
+      setShowThanksOverlay(true)
+
+      if (thanksTimeoutRef.current) {
+        window.clearTimeout(thanksTimeoutRef.current)
+      }
+
+      thanksTimeoutRef.current = window.setTimeout(() => {
+        setShowThanksOverlay(false)
+        thanksTimeoutRef.current = null
+      }, 2000)
+    }
+
+    if (!isAllChecked) {
+      setShowThanksOverlay(false)
+      if (thanksTimeoutRef.current) {
+        window.clearTimeout(thanksTimeoutRef.current)
+        thanksTimeoutRef.current = null
+      }
+    }
+
+    wasAllCheckedRef.current = isAllChecked
+  }, [visibleItems])
+
+  useEffect(() => {
+    return () => {
+      if (thanksTimeoutRef.current) {
+        window.clearTimeout(thanksTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const addItem = async (event) => {
     event.preventDefault()
     setError('')
-    setMessage('')
 
     const text = String(newItemText || '').trim()
     if (!text) {
@@ -75,7 +112,6 @@ export default function ShoppingListPage({
         await loadItems()
       }
       setNewItemText('')
-      setMessage('Елемент додано до списку')
     } catch (addError) {
       setError(addError.message)
     } finally {
@@ -90,7 +126,6 @@ export default function ShoppingListPage({
     }
 
     setError('')
-    setMessage('')
     setActiveToggleId(itemId)
 
     try {
@@ -109,13 +144,11 @@ export default function ShoppingListPage({
 
   const clearList = async () => {
     setError('')
-    setMessage('')
     setIsClearing(true)
 
     try {
       await onClearShoppingList?.()
       setItems([])
-      setMessage('Список очищено')
     } catch (clearError) {
       setError(clearError.message)
     } finally {
@@ -145,7 +178,6 @@ export default function ShoppingListPage({
         </form>
 
         {error ? <p className="state-message state-message--error">{error}</p> : null}
-        {message ? <p className="state-message">{message}</p> : null}
       </section>
 
       <section className="admin-panel" aria-label="Елементи списку покупок">
@@ -188,6 +220,23 @@ export default function ShoppingListPage({
           {isClearing ? 'Очищую...' : 'Очистити список'}
         </button>
       </div>
+
+      {showThanksOverlay ? (
+        <div className="shopping-thanks-overlay" aria-hidden="true">
+          <div className="shopping-thanks-backdrop" />
+          <div className="shopping-thanks-scene">
+            <span className="shopping-thanks-star shopping-thanks-star--1">✦</span>
+            <span className="shopping-thanks-star shopping-thanks-star--2">✶</span>
+            <span className="shopping-thanks-star shopping-thanks-star--3">✦</span>
+            <span className="shopping-thanks-star shopping-thanks-star--4">✷</span>
+            <span className="shopping-thanks-star shopping-thanks-star--5">✦</span>
+            <span className="shopping-thanks-star shopping-thanks-star--6">✶</span>
+            <span className="shopping-thanks-star shopping-thanks-star--7">✷</span>
+            <span className="shopping-thanks-star shopping-thanks-star--8">✦</span>
+            <strong className="shopping-thanks-text">дякую!</strong>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
