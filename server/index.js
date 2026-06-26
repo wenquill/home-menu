@@ -563,6 +563,7 @@ app.get('/api/menu-plan', authRequired, (req, res) => {
 app.post('/api/menu-plan', authRequired, (req, res) => {
   const dishId = Number(req.body.dishId)
   const menuDate = String(req.body.menuDate || '').trim()
+  const components = Array.isArray(req.body.components) ? req.body.components : undefined
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'dishId має бути числом' })
@@ -573,7 +574,7 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
   }
 
   try {
-    const menuEntry = createMenuEntry({ dishId, menuDate })
+    const menuEntry = createMenuEntry({ dishId, menuDate, components })
     const actorName = req.user.displayName || req.user.email
 
     const dish = getDishById(dishId)

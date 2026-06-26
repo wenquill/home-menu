@@ -257,7 +257,7 @@ function App() {
     return apiRequest(`/api/menu-plan?date=${encodeURIComponent(menuDate)}`, {}, authToken)
   }
 
-  const handleScheduleDishToMenu = async ({ dishId, menuDate }) => {
+  const handleScheduleDishToMenu = async ({ dishId, menuDate, components }) => {
     if (!isAuthenticated) {
       throw new Error('Потрібна авторизація')
     }
@@ -266,7 +266,7 @@ function App() {
       '/api/menu-plan',
       {
         method: 'POST',
-        body: JSON.stringify({ dishId, menuDate }),
+        body: JSON.stringify({ dishId, menuDate, components }),
       },
       authToken,
     )

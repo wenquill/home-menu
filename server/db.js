@@ -109,6 +109,61 @@ function replaceDishComponents(dishId, components) {
   })
 }
 
+function getMenuEntryComponentsByEntryIds(menuEntryIds) {
+  if (!menuEntryIds.length) {
+    return new Map()
+  }
+
+  const placeholders = menuEntryIds.map(() => '?').join(', ')
+  const rows = db.prepare(
+    `SELECT menu_entry_id AS menuEntryId, name
+     FROM menu_entry_components
+     WHERE menu_entry_id IN (${placeholders})
+     ORDER BY position ASC, id ASC`,
+  ).all(...menuEntryIds)
+
+  const componentsByMenuEntry = new Map()
+
+  for (const row of rows) {
+    const existing = componentsByMenuEntry.get(row.menuEntryId) || []
+    existing.push(row.name)
+    componentsByMenuEntry.set(row.menuEntryId, existing)
+  }
+
+  return componentsByMenuEntry
+}
+
+function replaceMenuEntryComponents(menuEntryId, components) {
+  const normalized = normalizeDishComponents(components)
+
+  db.prepare('DELETE FROM menu_entry_components WHERE menu_entry_id = ?').run(menuEntryId)
+
+  if (!normalized.length) {
+    return
+  }
+
+  const insertComponent = db.prepare(
+    'INSERT INTO menu_entry_components (menu_entry_id, name, position) VALUES (?, ?, ?)',
+  )
+
+  normalized.forEach((name, index) => {
+    insertComponent.run(menuEntryId, name, index)
+  })
+}
+
+function selectMenuEntryComponents(selectedComponents, dishComponents) {
+  const available = normalizeDishComponents(dishComponents)
+
+  if (!Array.isArray(selectedComponents)) {
+    return available
+  }
+
+  const selected = normalizeDishComponents(selectedComponents)
+  const selectedSet = new Set(selected.map((item) => item.toLowerCase()))
+
+  return available.filter((component) => selectedSet.has(component.toLowerCase()))
+}
+
 function normalizeMenuDate(menuDate) {
   const value = String(menuDate || '').trim()
 
@@ -133,6 +188,23 @@ function getMenuPlannedDishIdsByDate(menuDate) {
   return db
     .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE menu_date = ? ORDER BY id DESC')
     .all(normalizedDate)
+}
+
+function attachMenuEntryComponents(menuEntries) {
+  const menuEntryIds = menuEntries.map((entry) => entry.menuEntryId).filter(Boolean)
+  const dishIds = menuEntries.map((entry) => entry.id)
+  const componentsByMenuEntry = getMenuEntryComponentsByEntryIds(menuEntryIds)
+  const componentsByDish = getDishComponentsByDishIds(dishIds)
+
+  return menuEntries.map((entry) => {
+    const entryComponents = componentsByMenuEntry.get(entry.menuEntryId)
+    const fallbackDishComponents = componentsByDish.get(entry.id) || []
+
+    return {
+      ...entry,
+      components: entryComponents !== undefined ? entryComponents : fallbackDishComponents,
+    }
+  })
 }
 
 function parseActivityLogDetails(detailsJson) {
@@ -331,6 +403,15 @@ export function initializeDatabase() {
       UNIQUE(dish_id, menu_date)
     );
 
+    CREATE TABLE IF NOT EXISTS menu_entry_components (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      menu_entry_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (menu_entry_id) REFERENCES menu_entries(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS activity_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       actor_user_id INTEGER NOT NULL,
@@ -356,6 +437,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
     CREATE INDEX IF NOT EXISTS idx_dish_components_dish ON dish_components(dish_id);
     CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
+    CREATE INDEX IF NOT EXISTS idx_menu_entry_components_entry ON menu_entry_components(menu_entry_id);
     CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -401,6 +483,23 @@ export function initializeDatabase() {
         UNIQUE(dish_id, menu_date)
       );
       CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
+    `)
+  }
+
+  const menuEntryComponentColumns = db.prepare("PRAGMA table_info('menu_entry_components')").all()
+  const hasMenuEntryComponentsTable = menuEntryComponentColumns.length > 0
+
+  if (!hasMenuEntryComponentsTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS menu_entry_components (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        menu_entry_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (menu_entry_id) REFERENCES menu_entries(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_menu_entry_components_entry ON menu_entry_components(menu_entry_id);
     `)
   }
 
@@ -583,7 +682,7 @@ export function getMenuEntryById(id) {
     return null
   }
 
-  const [menuEntryWithComponents] = attachDishComponents([menuEntry])
+  const [menuEntryWithComponents] = attachMenuEntryComponents([menuEntry])
   return menuEntryWithComponents
 }
 
@@ -626,7 +725,7 @@ export function deleteDish(id) {
   return result.changes > 0
 }
 
-export function createMenuEntry({ dishId, menuDate }) {
+export function createMenuEntry({ dishId, menuDate, components }) {
   const normalizedDate = normalizeMenuDate(menuDate)
   const existingDish = getDishById(dishId)
 
@@ -634,9 +733,18 @@ export function createMenuEntry({ dishId, menuDate }) {
     throw new Error('Страву не знайдено')
   }
 
-  const result = db
-    .prepare('INSERT INTO menu_entries (dish_id, menu_date) VALUES (?, ?)')
-    .run(dishId, normalizedDate)
+  const selectedComponents = selectMenuEntryComponents(components, existingDish.components || [])
+
+  const result = db.transaction(() => {
+    const insertResult = db
+      .prepare('INSERT INTO menu_entries (dish_id, menu_date) VALUES (?, ?)')
+      .run(dishId, normalizedDate)
+
+    const menuEntryId = Number(insertResult.lastInsertRowid)
+    replaceMenuEntryComponents(menuEntryId, selectedComponents)
+
+    return insertResult
+  })()
 
   return db
     .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE id = ?')
@@ -673,7 +781,7 @@ export function getMenuEntriesByDate(menuDate) {
     )
     .all(normalizedDate)
 
-  return attachDishComponents(menuEntries)
+  return attachMenuEntryComponents(menuEntries)
 }
 
 export function getUserByEmail(email) {

@@ -141,6 +141,7 @@ export default function CategoryPage({
   const [menuScheduleDish, setMenuScheduleDish] = useState(null)
   const [menuScheduleMode, setMenuScheduleMode] = useState('today')
   const [menuScheduleDate, setMenuScheduleDate] = useState('')
+  const [menuScheduleComponents, setMenuScheduleComponents] = useState([])
   const [menuScheduleError, setMenuScheduleError] = useState('')
   const [isSchedulingMenu, setIsSchedulingMenu] = useState(false)
   const [scheduleMessage, setScheduleMessage] = useState('')
@@ -227,12 +228,27 @@ export default function CategoryPage({
     setMenuScheduleDish(dish)
     setMenuScheduleMode('today')
     setMenuScheduleDate(todayDateString())
+    setMenuScheduleComponents(Array.isArray(dish?.components) ? dish.components : [])
     setMenuScheduleError('')
   }
 
   const closeScheduleMenuModal = () => {
     setMenuScheduleDish(null)
+    setMenuScheduleComponents([])
     setMenuScheduleError('')
+  }
+
+  const toggleMenuScheduleComponent = (componentName) => {
+    setMenuScheduleComponents((prev) => {
+      const normalized = String(componentName || '').trim().toLowerCase()
+      const exists = prev.some((item) => String(item || '').trim().toLowerCase() === normalized)
+
+      if (exists) {
+        return prev.filter((item) => String(item || '').trim().toLowerCase() !== normalized)
+      }
+
+      return [...prev, componentName]
+    })
   }
 
   const scheduleDish = async (menuDate) => {
@@ -244,7 +260,11 @@ export default function CategoryPage({
     setIsSchedulingMenu(true)
 
     try {
-      await onScheduleDishToMenu({ dishId: menuScheduleDish.id, menuDate })
+      await onScheduleDishToMenu({
+        dishId: menuScheduleDish.id,
+        menuDate,
+        components: menuScheduleComponents,
+      })
       closeScheduleMenuModal()
       setScheduleMessage('додано до меню')
 
@@ -678,6 +698,51 @@ export default function CategoryPage({
             <p className="dish-modal-warning">
               Оберіть, на яку дату запланувати страву <strong>{menuScheduleDish.title}</strong>.
             </p>
+
+            {menuScheduleDish.components?.length ? (
+              <div className="menu-schedule-components">
+                <p>компоненти для цієї страви у меню:</p>
+                <div className="menu-schedule-components-actions">
+                  <button
+                    type="button"
+                    className="menu-schedule-components-action"
+                    onClick={() => setMenuScheduleComponents(menuScheduleDish.components || [])}
+                    disabled={isSchedulingMenu}
+                  >
+                    обрати всі
+                  </button>
+                  <button
+                    type="button"
+                    className="menu-schedule-components-action"
+                    onClick={() => setMenuScheduleComponents([])}
+                    disabled={isSchedulingMenu}
+                  >
+                    очистити
+                  </button>
+                </div>
+                <div className="menu-schedule-components-list" aria-label="Вибір компонентів страви">
+                  {menuScheduleDish.components.map((component, index) => {
+                    const isChecked = menuScheduleComponents.some(
+                      (selected) =>
+                        String(selected || '').trim().toLowerCase() ===
+                        String(component || '').trim().toLowerCase(),
+                    )
+
+                    return (
+                      <label key={`${menuScheduleDish.id}-schedule-component-${index}`}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleMenuScheduleComponent(component)}
+                          disabled={isSchedulingMenu}
+                        />
+                        <span>{component}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             {menuScheduleError ? <p className="state-message state-message--error">{menuScheduleError}</p> : null}
 
