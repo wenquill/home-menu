@@ -212,6 +212,10 @@ function normalizeProjectName(name) {
   return String(name || '').trim()
 }
 
+function normalizeShoppingItemText(text) {
+  return String(text || '').trim()
+}
+
 function getMenuPlannedDishIdsByDate(menuDate) {
   const normalizedDate = normalizeMenuDate(menuDate)
 
@@ -511,6 +515,19 @@ export function initializeDatabase() {
       UNIQUE(user_id, activity_log_id)
     );
 
+    CREATE TABLE IF NOT EXISTS shopping_list_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      normalized_text TEXT NOT NULL,
+      is_checked INTEGER NOT NULL DEFAULT 0,
+      sort_index INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(project_id, normalized_text)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_user ON project_memberships(user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
@@ -523,6 +540,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_user_favorites_user ON user_favorites(user_id);
     CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
+    CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -709,6 +727,27 @@ export function initializeDatabase() {
     `)
   }
 
+  const shoppingListColumns = db.prepare("PRAGMA table_info('shopping_list_items')").all()
+  const hasShoppingListTable = shoppingListColumns.length > 0
+
+  if (!hasShoppingListTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS shopping_list_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        normalized_text TEXT NOT NULL,
+        is_checked INTEGER NOT NULL DEFAULT 0,
+        sort_index INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        UNIQUE(project_id, normalized_text)
+      );
+      CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
+    `)
+  }
+
   const adminCount = db
     .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN'")
     .get()
@@ -737,6 +776,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_menu_entries_project ON menu_entries(project_id);
     CREATE INDEX IF NOT EXISTS idx_user_favorites_project ON user_favorites(project_id);
     CREATE INDEX IF NOT EXISTS idx_activity_logs_project ON activity_logs(project_id);
+    CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
   `)
 
   const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get()
@@ -1073,9 +1113,14 @@ export function createMenuEntry({ dishId, menuDate, components }) {
     return insertResult
   })()
 
-  return db
+  const menuEntry = db
     .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE id = ?')
     .get(result.lastInsertRowid)
+
+  return {
+    ...menuEntry,
+    components: selectedComponents,
+  }
 }
 
 export function createMenuEntryInProject({ dishId, projectId, menuDate, components }) {
@@ -1099,9 +1144,14 @@ export function createMenuEntryInProject({ dishId, projectId, menuDate, componen
     return insertResult
   })()
 
-  return db
+  const menuEntry = db
     .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE id = ?')
     .get(result.lastInsertRowid)
+
+  return {
+    ...menuEntry,
+    components: selectedComponents,
+  }
 }
 
 export function deleteMenuEntryById(id) {
@@ -1164,6 +1214,195 @@ export function getMenuEntriesByDateInProject(menuDate, projectId) {
     .all(normalizedDate, projectId)
 
   return attachMenuEntryComponents(menuEntries)
+}
+
+function getNextShoppingSortIndex(projectId) {
+  const row = db
+    .prepare('SELECT COALESCE(MAX(sort_index), 0) + 1 AS nextSortIndex FROM shopping_list_items WHERE project_id = ?')
+    .get(projectId)
+
+  return Number(row?.nextSortIndex || 1)
+}
+
+function getShoppingItemByIdInProject(id, projectId) {
+  return db
+    .prepare(
+      `SELECT
+        id,
+        project_id AS projectId,
+        text,
+        is_checked AS isChecked,
+        sort_index AS sortIndex,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM shopping_list_items
+       WHERE id = ? AND project_id = ?`,
+    )
+    .get(id, projectId)
+}
+
+export function getShoppingListItemsByProject(projectId) {
+  const rows = db
+    .prepare(
+      `SELECT
+        id,
+        project_id AS projectId,
+        text,
+        is_checked AS isChecked,
+        sort_index AS sortIndex,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM shopping_list_items
+       WHERE project_id = ?
+       ORDER BY is_checked ASC, sort_index ASC, id ASC`,
+    )
+    .all(projectId)
+
+  return rows.map((row) => ({
+    ...row,
+    isChecked: Boolean(row.isChecked),
+  }))
+}
+
+export function addShoppingItemInProject({ projectId, text, checked = false }) {
+  const normalizedText = normalizeShoppingItemText(text)
+  if (!normalizedText) {
+    throw new Error('Назва елемента списку обовʼязкова')
+  }
+
+  const normalizedKey = normalizedText.toLowerCase()
+
+  const itemId = db.transaction(() => {
+    const existing = db
+      .prepare('SELECT id, is_checked AS isChecked FROM shopping_list_items WHERE project_id = ? AND normalized_text = ? LIMIT 1')
+      .get(projectId, normalizedKey)
+
+    const nextSortIndex = getNextShoppingSortIndex(projectId)
+    const checkedValue = checked ? 1 : 0
+
+    if (existing) {
+      db
+        .prepare(
+          `UPDATE shopping_list_items
+           SET text = ?,
+               is_checked = ?,
+               sort_index = ?,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+        )
+        .run(normalizedText, checkedValue, nextSortIndex, existing.id)
+
+      return existing.id
+    }
+
+    const result = db
+      .prepare(
+        `INSERT INTO shopping_list_items (project_id, text, normalized_text, is_checked, sort_index)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(projectId, normalizedText, normalizedKey, checkedValue, nextSortIndex)
+
+    return Number(result.lastInsertRowid)
+  })()
+
+  const item = getShoppingItemByIdInProject(itemId, projectId)
+  return {
+    ...item,
+    isChecked: Boolean(item?.isChecked),
+  }
+}
+
+export function addShoppingItemsInProject(projectId, items = []) {
+  const normalized = Array.from(
+    new Set(
+      (Array.isArray(items) ? items : [])
+        .map((item) => normalizeShoppingItemText(item))
+        .filter(Boolean)
+        .map((item) => item.toLowerCase()),
+    ),
+  )
+
+  if (!normalized.length) {
+    return []
+  }
+
+  const originalByKey = new Map()
+  ;(Array.isArray(items) ? items : []).forEach((item) => {
+    const text = normalizeShoppingItemText(item)
+    if (!text) {
+      return
+    }
+
+    const key = text.toLowerCase()
+    if (!originalByKey.has(key)) {
+      originalByKey.set(key, text)
+    }
+  })
+
+  const tx = db.transaction(() => {
+    normalized.forEach((key) => {
+      const existing = db
+        .prepare('SELECT id FROM shopping_list_items WHERE project_id = ? AND normalized_text = ? LIMIT 1')
+        .get(projectId, key)
+
+      const nextSortIndex = getNextShoppingSortIndex(projectId)
+      const text = originalByKey.get(key) || key
+
+      if (existing) {
+        db
+          .prepare(
+            `UPDATE shopping_list_items
+             SET text = ?, is_checked = 0, sort_index = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+          )
+          .run(text, nextSortIndex, existing.id)
+        return
+      }
+
+      db
+        .prepare(
+          `INSERT INTO shopping_list_items (project_id, text, normalized_text, is_checked, sort_index)
+           VALUES (?, ?, ?, 0, ?)`,
+        )
+        .run(projectId, text, key, nextSortIndex)
+    })
+  })
+
+  tx()
+
+  return getShoppingListItemsByProject(projectId)
+}
+
+export function updateShoppingItemCheckedInProject({ id, projectId, checked }) {
+  const existing = getShoppingItemByIdInProject(id, projectId)
+  if (!existing) {
+    return null
+  }
+
+  const checkedValue = checked ? 1 : 0
+  const nextSortIndex = checked ? getNextShoppingSortIndex(projectId) : existing.sortIndex
+
+  db
+    .prepare(
+      `UPDATE shopping_list_items
+       SET is_checked = ?, sort_index = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND project_id = ?`,
+    )
+    .run(checkedValue, nextSortIndex, id, projectId)
+
+  const updated = getShoppingItemByIdInProject(id, projectId)
+  return {
+    ...updated,
+    isChecked: Boolean(updated?.isChecked),
+  }
+}
+
+export function clearShoppingListInProject(projectId) {
+  const result = db
+    .prepare('DELETE FROM shopping_list_items WHERE project_id = ?')
+    .run(projectId)
+
+  return Number(result.changes || 0)
 }
 
 export function getFavoriteDishIdsForUser(userId) {

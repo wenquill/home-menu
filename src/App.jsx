@@ -10,6 +10,7 @@ import EditDishPage from './pages/EditDishPage'
 import MenuPage from './pages/MenuPage'
 import NoProjectAccessPage from './pages/NoProjectAccessPage'
 import ProfilePage from './pages/ProfilePage'
+import ShoppingListPage from './pages/ShoppingListPage'
 
 const emptyMenu = {
   mealCategories: [],
@@ -355,6 +356,42 @@ function App() {
     return apiRequest('/api/activity-logs/unread-count', {}, authToken)
   }
 
+  const handleLoadShoppingList = async () => {
+    return apiRequest('/api/shopping-list', {}, authToken)
+  }
+
+  const handleAddShoppingListItem = async (text) => {
+    return apiRequest(
+      '/api/shopping-list',
+      {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      },
+      authToken,
+    )
+  }
+
+  const handleUpdateShoppingListItem = async (itemId, checked) => {
+    return apiRequest(
+      `/api/shopping-list/${itemId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ checked }),
+      },
+      authToken,
+    )
+  }
+
+  const handleClearShoppingList = async () => {
+    return apiRequest(
+      '/api/shopping-list',
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+  }
+
   const refreshProjectScopedData = async () => {
     const [menu, favorites, projects] = await Promise.all([
       apiRequest('/api/menu', {}, authToken),
@@ -579,6 +616,17 @@ function App() {
             <MenuPage
               onLoadMenuEntries={handleGetMenuEntriesByDate}
               onRemoveMenuEntry={handleRemoveDishFromMenu}
+            />
+          )}
+        />
+        <Route
+          path="/shopping-list"
+          element={protectedContent(
+            <ShoppingListPage
+              onLoadShoppingList={handleLoadShoppingList}
+              onAddShoppingListItem={handleAddShoppingListItem}
+              onUpdateShoppingListItem={handleUpdateShoppingListItem}
+              onClearShoppingList={handleClearShoppingList}
             />
           )}
         />

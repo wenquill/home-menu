@@ -1190,12 +1190,8 @@ body {
 }
 
 .admin-panel {
-  margin-top: 18px;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: var(--card-shadow);
+  text-align: center;
 }
 
 .admin-panel--modal {
@@ -1277,6 +1273,116 @@ body {
   padding-bottom: 28px;
 }
 
+.shopping-page {
+  padding-bottom: 96px;
+}
+
+.shopping-add-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.shopping-add-row button {
+  width: auto;
+  min-width: 110px;
+}
+
+.shopping-clear-button {
+  width: 100%;
+  min-height: 36px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--btn-border);
+  color: var(--btn-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.shopping-clear-button:hover {
+  background: #ffd84d;
+  color: var(--btn-text);
+}
+
+.shopping-bottom-actions {
+  position: fixed;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: min(820px, calc(100% - 28px));
+  padding: 8px;
+  border-radius: 14px;
+  z-index: 12;
+}
+
+.shopping-clear-button:disabled {
+  cursor: default;
+}
+
+@media (max-width: 520px) {
+  .shopping-page {
+    padding-bottom: 88px;
+  }
+
+  .shopping-bottom-actions {
+    bottom: 8px;
+    padding: 6px;
+    width: calc(100% - 20px);
+  }
+}
+
+.shopping-list-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.shopping-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.shopping-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.shopping-item input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f3c400;
+}
+
+.shopping-item span {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.shopping-item--checked {
+  opacity: 0.72;
+}
+
+.shopping-item--checked span {
+  text-decoration: line-through;
+  color: #666;
+}
+
 .menu-page-header {
   margin: 2px 0 12px;
   display: flex;
@@ -1351,7 +1457,7 @@ body {
 .state-message {
   margin: 12px 2px;
   font-size: 14px;
-  color: var(--success);
+  color: var(--muted);
 }
 
 .state-message--error {

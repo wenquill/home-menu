@@ -214,6 +214,9 @@ export default function TopMenu({
                     <NavLink to="/menu" className={linkClass}>
                       Меню
                     </NavLink>
+                    <NavLink to="/shopping-list" className={linkClass}>
+                      Покупки
+                    </NavLink>
                     <NavLink to="/favorites" className={linkClass}>
                       Улюблені
                     </NavLink>

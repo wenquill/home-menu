@@ -5,7 +5,10 @@ import jwt from 'jsonwebtoken'
 import {
   addFavoriteDishForUser,
   addFavoriteDishForUserInProject,
+  addShoppingItemInProject,
+  addShoppingItemsInProject,
   addProjectMembership,
+  clearShoppingListInProject,
   countProjectMembers,
   createUser,
   createActivityLog,
@@ -30,6 +33,7 @@ import {
   getProjectById,
   getProjectRoleForUser,
   getProjectsForUser,
+  getShoppingListItemsByProject,
   getProjectMembers,
   getRecentActivityLogsForUser,
   getUnreadActivityLogsCountForUser,
@@ -46,6 +50,7 @@ import {
   removeFavoriteDishForUserInProject,
   removeProjectMembership,
   setCurrentProjectForUser,
+  updateShoppingItemCheckedInProject,
   updateUserById,
   updateDish,
   updateDishInProject,
@@ -534,6 +539,52 @@ app.get('/api/favorites', authRequired, projectAccessRequired, (req, res) => {
   return res.json({ dishIds })
 })
 
+app.get('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
+  const items = getShoppingListItemsByProject(req.projectId)
+  return res.json({ items })
+})
+
+app.post('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
+  const text = String(req.body.text || '').trim()
+
+  if (!text) {
+    return res.status(400).json({ message: 'Назва елемента списку обовʼязкова' })
+  }
+
+  try {
+    const item = addShoppingItemInProject({ projectId: req.projectId, text, checked: false })
+    return res.status(201).json(item)
+  } catch (error) {
+    return res.status(400).json({ message: error.message })
+  }
+})
+
+app.put('/api/shopping-list/:id', authRequired, projectAccessRequired, (req, res) => {
+  const itemId = Number(req.params.id)
+  const checked = Boolean(req.body.checked)
+
+  if (!Number.isInteger(itemId) || itemId < 1) {
+    return res.status(400).json({ message: 'Некоректний id елемента списку' })
+  }
+
+  const updated = updateShoppingItemCheckedInProject({
+    id: itemId,
+    projectId: req.projectId,
+    checked,
+  })
+
+  if (!updated) {
+    return res.status(404).json({ message: 'Елемент списку не знайдено' })
+  }
+
+  return res.json(updated)
+})
+
+app.delete('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
+  clearShoppingListInProject(req.projectId)
+  return res.status(204).send()
+})
+
 app.post('/api/favorites/:dishId', authRequired, projectAccessRequired, (req, res) => {
   const dishId = Number(req.params.dishId)
 
@@ -797,6 +848,8 @@ app.post('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
       menuDate,
       components,
     })
+    addShoppingItemsInProject(req.projectId, menuEntry.components || [])
+
     const actorName = req.user.displayName || req.user.email
 
     const dish = getDishByIdInProject(dishId, req.projectId)
