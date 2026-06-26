@@ -6,8 +6,8 @@
   --muted: #505050;
   --line: #e7e7e7;
   --chip: #f4f4f4;
-  --chip-active: #121212;
-  --chip-active-text: #ffffff;
+  --chip-active: #ffd84d;
+  --chip-active-text: #1f1f1f;
   --card-bg: #ffffff;
   --card-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   --success: #0b7a3a;
@@ -247,6 +247,20 @@ body {
   box-shadow: var(--card-shadow);
 }
 
+.dish-card--interactive {
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.dish-card--interactive:hover {
+  transform: translateY(-2px);
+}
+
+.dish-card--interactive:focus-visible {
+  outline: 2px solid #f3c400;
+  outline-offset: 2px;
+}
+
 .dish-card h3 {
   margin: 0;
   font-size: 18px;
@@ -268,6 +282,127 @@ body {
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.dish-edit-button {
+  margin-top: 10px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.dish-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(20, 20, 20, 0.25);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.dish-modal {
+  width: min(520px, 100%);
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #fffef8;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
+  padding: 18px;
+  position: relative;
+}
+
+.dish-modal h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.dish-modal p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dish-modal-tags {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dish-modal-tags span {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dish-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.dish-modal-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.dish-modal-form label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.dish-modal-form input,
+.dish-modal-form textarea,
+.dish-modal-form select {
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.dish-modal-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dish-modal-actions button {
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dish-modal-secondary {
+  border-color: var(--line) !important;
+  background: #fff !important;
 }
 
 .dish-card--empty {

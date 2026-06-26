@@ -253,6 +253,7 @@ function App() {
               dishes={menuData.dishes}
               defaultCategoryId={defaultCategoryId}
               isAdmin={isAdmin}
+              onUpdateDish={handleUpdateDish}
             />
           )}
         />
