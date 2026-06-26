@@ -208,6 +208,10 @@ function normalizeActivityDetails(details) {
   return details
 }
 
+function normalizeProjectName(name) {
+  return String(name || '').trim()
+}
+
 function getMenuPlannedDishIdsByDate(menuDate) {
   const normalizedDate = normalizeMenuDate(menuDate)
 
@@ -379,6 +383,20 @@ function seedAdminUser() {
   ).run(adminEmail, adminDisplayName, adminPasswordHash || fallbackPasswordHash, 'ADMIN')
 }
 
+function getDefaultProject() {
+  return db.prepare('SELECT id, name FROM projects ORDER BY id ASC LIMIT 1').get()
+}
+
+function ensureDefaultProject() {
+  const existing = getDefaultProject()
+  if (existing) {
+    return existing
+  }
+
+  const result = db.prepare('INSERT INTO projects (name, created_by_user_id) VALUES (?, NULL)').run('default')
+  return db.prepare('SELECT id, name FROM projects WHERE id = ?').get(result.lastInsertRowid)
+}
+
 export function initializeDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -388,15 +406,36 @@ export function initializeDatabase() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('ADMIN', 'USER')),
       avatar_url TEXT NOT NULL DEFAULT '',
+      current_project_id INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      created_by_user_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS project_memberships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      project_id INTEGER NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('OWNER', 'MEMBER')),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE(user_id, project_id)
     );
 
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       kind TEXT NOT NULL CHECK (kind IN ('MEAL', 'TYPE')),
+      project_id INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(name, kind)
+      UNIQUE(name, kind, project_id)
     );
 
     CREATE TABLE IF NOT EXISTS dishes (
@@ -404,6 +443,7 @@ export function initializeDatabase() {
       title TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       recipe TEXT NOT NULL DEFAULT '',
+      project_id INTEGER NOT NULL DEFAULT 1,
       meal_category_id INTEGER NOT NULL,
       type_category_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -423,10 +463,11 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS menu_entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       dish_id INTEGER NOT NULL,
+      project_id INTEGER NOT NULL DEFAULT 1,
       menu_date TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
-      UNIQUE(dish_id, menu_date)
+      UNIQUE(dish_id, menu_date, project_id)
     );
 
     CREATE TABLE IF NOT EXISTS menu_entry_components (
@@ -442,10 +483,11 @@ export function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       dish_id INTEGER NOT NULL,
+      project_id INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (dish_id) REFERENCES dishes(id) ON DELETE CASCADE,
-      UNIQUE(user_id, dish_id)
+      UNIQUE(user_id, dish_id, project_id)
     );
 
     CREATE TABLE IF NOT EXISTS activity_logs (
@@ -454,6 +496,7 @@ export function initializeDatabase() {
       actor_email TEXT NOT NULL,
       action TEXT NOT NULL,
       message TEXT NOT NULL,
+      project_id INTEGER NOT NULL DEFAULT 1,
       details_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -468,6 +511,9 @@ export function initializeDatabase() {
       UNIQUE(user_id, activity_log_id)
     );
 
+    CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
+    CREATE INDEX IF NOT EXISTS idx_project_memberships_user ON project_memberships(user_id);
+    CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
     CREATE INDEX IF NOT EXISTS idx_categories_kind ON categories(kind);
     CREATE INDEX IF NOT EXISTS idx_dishes_meal_category ON dishes(meal_category_id);
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
@@ -492,6 +538,12 @@ export function initializeDatabase() {
     db.exec("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''")
   }
 
+  const hasCurrentProjectColumn = userColumns.some((column) => column.name === 'current_project_id')
+
+  if (!hasCurrentProjectColumn) {
+    db.exec('ALTER TABLE users ADD COLUMN current_project_id INTEGER')
+  }
+
   db.prepare(
     `UPDATE users
      SET display_name = SUBSTR(email, 1, INSTR(email, '@') - 1)
@@ -501,13 +553,26 @@ export function initializeDatabase() {
 
   const dishColumns = db.prepare("PRAGMA table_info('dishes')").all()
   const hasRecipeColumn = dishColumns.some((column) => column.name === 'recipe')
+  const hasDishProjectColumn = dishColumns.some((column) => column.name === 'project_id')
 
   if (!hasRecipeColumn) {
     db.exec("ALTER TABLE dishes ADD COLUMN recipe TEXT NOT NULL DEFAULT ''")
   }
 
+  if (!hasDishProjectColumn) {
+    db.exec('ALTER TABLE dishes ADD COLUMN project_id INTEGER NOT NULL DEFAULT 1')
+  }
+
+  const categoryColumns = db.prepare("PRAGMA table_info('categories')").all()
+  const hasCategoryProjectColumn = categoryColumns.some((column) => column.name === 'project_id')
+
+  if (!hasCategoryProjectColumn) {
+    db.exec('ALTER TABLE categories ADD COLUMN project_id INTEGER NOT NULL DEFAULT 1')
+  }
+
   const menuEntryColumns = db.prepare("PRAGMA table_info('menu_entries')").all()
   const hasMenuEntryTable = menuEntryColumns.length > 0
+  const hasMenuEntryProjectColumn = menuEntryColumns.some((column) => column.name === 'project_id')
 
   if (!hasMenuEntryTable) {
     db.exec(`
@@ -521,6 +586,10 @@ export function initializeDatabase() {
       );
       CREATE INDEX IF NOT EXISTS idx_menu_entries_date ON menu_entries(menu_date);
     `)
+  }
+
+  if (hasMenuEntryTable && !hasMenuEntryProjectColumn) {
+    db.exec('ALTER TABLE menu_entries ADD COLUMN project_id INTEGER NOT NULL DEFAULT 1')
   }
 
   const menuEntryComponentColumns = db.prepare("PRAGMA table_info('menu_entry_components')").all()
@@ -542,6 +611,7 @@ export function initializeDatabase() {
 
   const favoriteColumns = db.prepare("PRAGMA table_info('user_favorites')").all()
   const hasFavoritesTable = favoriteColumns.length > 0
+  const hasFavoriteProjectColumn = favoriteColumns.some((column) => column.name === 'project_id')
 
   if (!hasFavoritesTable) {
     db.exec(`
@@ -558,8 +628,49 @@ export function initializeDatabase() {
     `)
   }
 
+  if (hasFavoritesTable && !hasFavoriteProjectColumn) {
+    db.exec('ALTER TABLE user_favorites ADD COLUMN project_id INTEGER NOT NULL DEFAULT 1')
+  }
+
+  const projectColumns = db.prepare("PRAGMA table_info('projects')").all()
+  const hasProjectsTable = projectColumns.length > 0
+
+  if (!hasProjectsTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_by_user_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
+    `)
+  }
+
+  const membershipColumns = db.prepare("PRAGMA table_info('project_memberships')").all()
+  const hasMembershipsTable = membershipColumns.length > 0
+
+  if (!hasMembershipsTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_memberships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        project_id INTEGER NOT NULL,
+        role TEXT NOT NULL CHECK (role IN ('OWNER', 'MEMBER')),
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        UNIQUE(user_id, project_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_memberships_user ON project_memberships(user_id);
+      CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
+    `)
+  }
+
   const activityLogColumns = db.prepare("PRAGMA table_info('activity_logs')").all()
   const hasActivityLogTable = activityLogColumns.length > 0
+  const hasActivityLogProjectColumn = activityLogColumns.some((column) => column.name === 'project_id')
 
   if (!hasActivityLogTable) {
     db.exec(`
@@ -574,6 +685,10 @@ export function initializeDatabase() {
       );
       CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
     `)
+  }
+
+  if (hasActivityLogTable && !hasActivityLogProjectColumn) {
+    db.exec('ALTER TABLE activity_logs ADD COLUMN project_id INTEGER NOT NULL DEFAULT 1')
   }
 
   const activityLogReadColumns = db.prepare("PRAGMA table_info('activity_log_reads')").all()
@@ -602,6 +717,28 @@ export function initializeDatabase() {
     seedAdminUser()
   }
 
+  const defaultProject = ensureDefaultProject()
+
+  db.prepare(
+    `INSERT OR IGNORE INTO project_memberships (user_id, project_id, role)
+     SELECT id, ?, 'OWNER' FROM users WHERE role = 'ADMIN'`,
+  ).run(defaultProject.id)
+
+  db.prepare(
+    `UPDATE users
+     SET current_project_id = ?
+     WHERE role = 'ADMIN' AND current_project_id IS NULL`,
+  ).run(defaultProject.id)
+
+  // Create project-scoped indexes only after migration columns definitely exist.
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_categories_project ON categories(project_id);
+    CREATE INDEX IF NOT EXISTS idx_dishes_project ON dishes(project_id);
+    CREATE INDEX IF NOT EXISTS idx_menu_entries_project ON menu_entries(project_id);
+    CREATE INDEX IF NOT EXISTS idx_user_favorites_project ON user_favorites(project_id);
+    CREATE INDEX IF NOT EXISTS idx_activity_logs_project ON activity_logs(project_id);
+  `)
+
   const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get()
 
   if (categoryCount.count === 0) {
@@ -625,14 +762,40 @@ export function getCategories(kind) {
   return db.prepare('SELECT id, name, kind FROM categories ORDER BY id').all()
 }
 
+export function getCategoriesByProject(projectId, kind) {
+  if (kind) {
+    return db
+      .prepare('SELECT id, name, kind FROM categories WHERE project_id = ? AND kind = ? ORDER BY id')
+      .all(projectId, kind)
+  }
+
+  return db.prepare('SELECT id, name, kind FROM categories WHERE project_id = ? ORDER BY id').all(projectId)
+}
+
 export function getCategoryById(id) {
   return db.prepare('SELECT id, name, kind FROM categories WHERE id = ?').get(id)
+}
+
+export function getCategoryByIdInProject(id, projectId) {
+  return db
+    .prepare('SELECT id, name, kind FROM categories WHERE id = ? AND project_id = ?')
+    .get(id, projectId)
 }
 
 export function createCategory({ name, kind }) {
   const result = db
     .prepare('INSERT INTO categories (name, kind) VALUES (?, ?)')
     .run(name, kind)
+
+  return db
+    .prepare('SELECT id, name, kind FROM categories WHERE id = ?')
+    .get(result.lastInsertRowid)
+}
+
+export function createCategoryInProject({ name, kind, projectId }) {
+  const result = db
+    .prepare('INSERT INTO categories (name, kind, project_id) VALUES (?, ?, ?)')
+    .run(name, kind, projectId)
 
   return db
     .prepare('SELECT id, name, kind FROM categories WHERE id = ?')
@@ -684,6 +847,53 @@ export function getDishes(categoryId) {
   return attachDishComponents(dishes)
 }
 
+export function getDishesByProject(projectId, categoryId) {
+  if (categoryId) {
+    const dishes = db
+      .prepare(
+        `SELECT
+          d.id,
+          d.title,
+          d.description,
+          d.recipe,
+          d.meal_category_id AS mealCategoryId,
+          d.type_category_id AS typeCategoryId,
+          meal.name AS mealCategoryName,
+          type.name AS typeCategoryName
+         FROM dishes d
+         JOIN categories meal ON meal.id = d.meal_category_id
+         JOIN categories type ON type.id = d.type_category_id
+         WHERE d.project_id = ?
+           AND (d.meal_category_id = ? OR d.type_category_id = ?)
+         ORDER BY d.id DESC`,
+      )
+      .all(projectId, categoryId, categoryId)
+
+    return attachDishComponents(dishes)
+  }
+
+  const dishes = db
+    .prepare(
+      `SELECT
+        d.id,
+        d.title,
+        d.description,
+        d.recipe,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM dishes d
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE d.project_id = ?
+       ORDER BY d.id DESC`,
+    )
+    .all(projectId)
+
+  return attachDishComponents(dishes)
+}
+
 export function getDishById(id) {
   const dish = db
     .prepare(
@@ -711,11 +921,39 @@ export function getDishById(id) {
   return dishWithComponents
 }
 
+export function getDishByIdInProject(id, projectId) {
+  const dish = db
+    .prepare(
+      `SELECT
+        d.id,
+        d.title,
+        d.description,
+        d.recipe,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM dishes d
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE d.id = ? AND d.project_id = ?`,
+    )
+    .get(id, projectId)
+
+  if (!dish) {
+    return null
+  }
+
+  const [dishWithComponents] = attachDishComponents([dish])
+  return dishWithComponents
+}
+
 export function getMenuEntryById(id) {
   const menuEntry = db
     .prepare(
       `SELECT
         me.id AS menuEntryId,
+        me.project_id AS projectId,
         me.menu_date AS menuDate,
         d.id,
         d.title,
@@ -759,6 +997,24 @@ export function createDish({ title, description, recipe = '', mealCategoryId, ty
   return getDishById(dishId)
 }
 
+export function createDishInProject({ title, description, recipe = '', projectId, mealCategoryId, typeCategoryId, components = [] }) {
+  const transaction = db.transaction(() => {
+    const result = db
+      .prepare(
+        `INSERT INTO dishes (title, description, recipe, project_id, meal_category_id, type_category_id)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(title, description, recipe, projectId, mealCategoryId, typeCategoryId)
+
+    const dishId = Number(result.lastInsertRowid)
+    replaceDishComponents(dishId, components)
+    return dishId
+  })
+
+  const dishId = transaction()
+  return getDishById(dishId)
+}
+
 export function updateDish({ id, title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
   const transaction = db.transaction(() => {
     db.prepare(
@@ -766,6 +1022,22 @@ export function updateDish({ id, title, description, recipe = '', mealCategoryId
        SET title = ?, description = ?, recipe = ?, meal_category_id = ?, type_category_id = ?
        WHERE id = ?`,
     ).run(title, description, recipe, mealCategoryId, typeCategoryId, id)
+
+    replaceDishComponents(id, components)
+  })
+
+  transaction()
+
+  return getDishById(id)
+}
+
+export function updateDishInProject({ id, title, description, recipe = '', projectId, mealCategoryId, typeCategoryId, components = [] }) {
+  const transaction = db.transaction(() => {
+    db.prepare(
+      `UPDATE dishes
+       SET title = ?, description = ?, recipe = ?, meal_category_id = ?, type_category_id = ?
+       WHERE id = ? AND project_id = ?`,
+    ).run(title, description, recipe, mealCategoryId, typeCategoryId, id, projectId)
 
     replaceDishComponents(id, components)
   })
@@ -794,6 +1066,32 @@ export function createMenuEntry({ dishId, menuDate, components }) {
     const insertResult = db
       .prepare('INSERT INTO menu_entries (dish_id, menu_date) VALUES (?, ?)')
       .run(dishId, normalizedDate)
+
+    const menuEntryId = Number(insertResult.lastInsertRowid)
+    replaceMenuEntryComponents(menuEntryId, selectedComponents)
+
+    return insertResult
+  })()
+
+  return db
+    .prepare('SELECT id, dish_id AS dishId, menu_date AS menuDate FROM menu_entries WHERE id = ?')
+    .get(result.lastInsertRowid)
+}
+
+export function createMenuEntryInProject({ dishId, projectId, menuDate, components }) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+  const existingDish = getDishByIdInProject(dishId, projectId)
+
+  if (!existingDish) {
+    throw new Error('Страву не знайдено')
+  }
+
+  const selectedComponents = selectMenuEntryComponents(components, existingDish.components || [])
+
+  const result = db.transaction(() => {
+    const insertResult = db
+      .prepare('INSERT INTO menu_entries (dish_id, project_id, menu_date) VALUES (?, ?, ?)')
+      .run(dishId, projectId, normalizedDate)
 
     const menuEntryId = Number(insertResult.lastInsertRowid)
     replaceMenuEntryComponents(menuEntryId, selectedComponents)
@@ -839,6 +1137,35 @@ export function getMenuEntriesByDate(menuDate) {
   return attachMenuEntryComponents(menuEntries)
 }
 
+export function getMenuEntriesByDateInProject(menuDate, projectId) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+
+  const menuEntries = db
+    .prepare(
+      `SELECT
+        me.id AS menuEntryId,
+        me.menu_date AS menuDate,
+        d.id,
+        d.title,
+        d.description,
+        d.recipe,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM menu_entries me
+       JOIN dishes d ON d.id = me.dish_id
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE me.menu_date = ?
+         AND me.project_id = ?
+       ORDER BY me.id DESC`,
+    )
+    .all(normalizedDate, projectId)
+
+  return attachMenuEntryComponents(menuEntries)
+}
+
 export function getFavoriteDishIdsForUser(userId) {
   const rows = db
     .prepare(
@@ -852,10 +1179,31 @@ export function getFavoriteDishIdsForUser(userId) {
   return rows.map((row) => Number(row.dishId))
 }
 
+export function getFavoriteDishIdsForUserInProject(userId, projectId) {
+  const rows = db
+    .prepare(
+      `SELECT dish_id AS dishId
+       FROM user_favorites
+       WHERE user_id = ? AND project_id = ?
+       ORDER BY id DESC`,
+    )
+    .all(userId, projectId)
+
+  return rows.map((row) => Number(row.dishId))
+}
+
 export function addFavoriteDishForUser(userId, dishId) {
   const result = db
     .prepare('INSERT OR IGNORE INTO user_favorites (user_id, dish_id) VALUES (?, ?)')
     .run(userId, dishId)
+
+  return result.changes > 0
+}
+
+export function addFavoriteDishForUserInProject(userId, dishId, projectId) {
+  const result = db
+    .prepare('INSERT OR IGNORE INTO user_favorites (user_id, dish_id, project_id) VALUES (?, ?, ?)')
+    .run(userId, dishId, projectId)
 
   return result.changes > 0
 }
@@ -868,6 +1216,191 @@ export function removeFavoriteDishForUser(userId, dishId) {
   return result.changes > 0
 }
 
+export function removeFavoriteDishForUserInProject(userId, dishId, projectId) {
+  const result = db
+    .prepare('DELETE FROM user_favorites WHERE user_id = ? AND dish_id = ? AND project_id = ?')
+    .run(userId, dishId, projectId)
+
+  return result.changes > 0
+}
+
+export function getProjectsForUser(userId) {
+  return db
+    .prepare(
+      `SELECT
+        p.id,
+        p.name,
+        m.role,
+        p.created_at AS createdAt
+       FROM project_memberships m
+       JOIN projects p ON p.id = m.project_id
+       WHERE m.user_id = ?
+       ORDER BY p.id ASC`,
+    )
+    .all(userId)
+}
+
+export function getProjectById(projectId) {
+  return db
+    .prepare(
+      `SELECT
+        p.id,
+        p.name,
+        p.created_by_user_id AS createdByUserId,
+        p.created_at AS createdAt
+       FROM projects p
+       WHERE p.id = ?`,
+    )
+    .get(projectId)
+}
+
+export function createProject({ name, createdByUserId }) {
+  const normalizedName = normalizeProjectName(name)
+
+  const result = db
+    .prepare('INSERT INTO projects (name, created_by_user_id) VALUES (?, ?)')
+    .run(normalizedName, createdByUserId || null)
+
+  const projectId = Number(result.lastInsertRowid)
+
+  db.prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role) VALUES (?, ?, ?)')
+    .run(createdByUserId, projectId, 'OWNER')
+
+  db.prepare('UPDATE users SET current_project_id = ? WHERE id = ?')
+    .run(projectId, createdByUserId)
+
+  return getProjectById(projectId)
+}
+
+export function addProjectMembership({ userId, projectId, role = 'MEMBER' }) {
+  const normalizedRole = String(role || '').toUpperCase() === 'OWNER' ? 'OWNER' : 'MEMBER'
+
+  const result = db
+    .prepare('INSERT OR IGNORE INTO project_memberships (user_id, project_id, role) VALUES (?, ?, ?)')
+    .run(userId, projectId, normalizedRole)
+
+  db.prepare(
+    `UPDATE users
+     SET current_project_id = COALESCE(current_project_id, ?)
+     WHERE id = ?`,
+  ).run(projectId, userId)
+
+  return result.changes > 0
+}
+
+export function isUserInProject(userId, projectId) {
+  const row = db
+    .prepare('SELECT id FROM project_memberships WHERE user_id = ? AND project_id = ? LIMIT 1')
+    .get(userId, projectId)
+
+  return Boolean(row)
+}
+
+export function getProjectRoleForUser(userId, projectId) {
+  const row = db
+    .prepare('SELECT role FROM project_memberships WHERE user_id = ? AND project_id = ? LIMIT 1')
+    .get(userId, projectId)
+
+  return row?.role || null
+}
+
+export function setCurrentProjectForUser(userId, projectId) {
+  db.prepare('UPDATE users SET current_project_id = ? WHERE id = ?').run(projectId, userId)
+  return getUserById(userId)
+}
+
+export function countProjectMembers(projectId) {
+  const row = db
+    .prepare('SELECT COUNT(*) AS count FROM project_memberships WHERE project_id = ?')
+    .get(projectId)
+
+  return Number(row?.count || 0)
+}
+
+export function getProjectMembers(projectId) {
+  return db
+    .prepare(
+      `SELECT
+        u.id,
+        u.email,
+        u.display_name AS displayName,
+        u.avatar_url AS avatarUrl,
+        u.current_project_id AS currentProjectId,
+        m.role,
+        m.created_at AS joinedAt
+       FROM project_memberships m
+       JOIN users u ON u.id = m.user_id
+       WHERE m.project_id = ?
+       ORDER BY
+         CASE WHEN m.role = 'OWNER' THEN 0 ELSE 1 END,
+         u.display_name COLLATE NOCASE ASC,
+         u.email COLLATE NOCASE ASC`,
+    )
+    .all(projectId)
+}
+
+export function removeProjectMembership(userId, projectId) {
+  const tx = db.transaction(() => {
+    const membership = db
+      .prepare(
+        `SELECT
+          m.role,
+          u.current_project_id AS currentProjectId
+         FROM project_memberships m
+         JOIN users u ON u.id = m.user_id
+         WHERE m.user_id = ? AND m.project_id = ?
+         LIMIT 1`,
+      )
+      .get(userId, projectId)
+
+    if (!membership) {
+      return { removed: false, reason: 'NOT_FOUND' }
+    }
+
+    if (membership.role === 'OWNER') {
+      const ownerCountRow = db
+        .prepare(
+          `SELECT COUNT(*) AS count
+           FROM project_memberships
+           WHERE project_id = ? AND role = 'OWNER'`,
+        )
+        .get(projectId)
+
+      const ownerCount = Number(ownerCountRow?.count || 0)
+      if (ownerCount <= 1) {
+        return { removed: false, reason: 'LAST_OWNER' }
+      }
+    }
+
+    const deleteResult = db
+      .prepare('DELETE FROM project_memberships WHERE user_id = ? AND project_id = ?')
+      .run(userId, projectId)
+
+    if (deleteResult.changes === 0) {
+      return { removed: false, reason: 'NOT_FOUND' }
+    }
+
+    if (Number(membership.currentProjectId) === Number(projectId)) {
+      const nextMembership = db
+        .prepare(
+          `SELECT project_id AS projectId
+           FROM project_memberships
+           WHERE user_id = ?
+           ORDER BY project_id ASC
+           LIMIT 1`,
+        )
+        .get(userId)
+
+      db.prepare('UPDATE users SET current_project_id = ? WHERE id = ?')
+        .run(nextMembership?.projectId || null, userId)
+    }
+
+    return { removed: true }
+  })
+
+  return tx()
+}
+
 export function getUserByEmail(email) {
   return db
     .prepare(
@@ -877,6 +1410,7 @@ export function getUserByEmail(email) {
         display_name AS displayName,
         password_hash AS passwordHash,
         role,
+        current_project_id AS currentProjectId,
         avatar_url AS avatarUrl
        FROM users
        WHERE email = ?`,
@@ -892,6 +1426,7 @@ export function getUserById(id) {
         email,
         display_name AS displayName,
         role,
+        current_project_id AS currentProjectId,
         avatar_url AS avatarUrl
        FROM users
        WHERE id = ?`,

@@ -5,8 +5,10 @@ import AddCategoryPage from './pages/AddCategoryPage'
 import AddDishPage from './pages/AddDishPage'
 import AuthPage from './pages/AuthPage'
 import CategoryPage from './pages/CategoryPage'
+import CurrentProjectPage from './pages/CurrentProjectPage'
 import EditDishPage from './pages/EditDishPage'
 import MenuPage from './pages/MenuPage'
+import NoProjectAccessPage from './pages/NoProjectAccessPage'
 import ProfilePage from './pages/ProfilePage'
 
 const emptyMenu = {
@@ -60,6 +62,8 @@ function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || '')
   const [currentUser, setCurrentUser] = useState(null)
   const [favoriteDishIds, setFavoriteDishIds] = useState([])
+  const [userProjects, setUserProjects] = useState([])
+  const [projectsReady, setProjectsReady] = useState(false)
   const [authReady, setAuthReady] = useState(false)
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
   const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
@@ -71,6 +75,7 @@ function App() {
 
   const defaultCategoryId =
     menuData.mealCategories[0]?.id ?? menuData.typeCategories[0]?.id ?? null
+  const hasProjectAccess = isAdmin || userProjects.length > 0
 
   const loadMenuData = async ({ background = false } = {}) => {
     if (!background) {
@@ -101,6 +106,14 @@ function App() {
     } catch (error) {
       setPageError(error.message)
     }
+  }
+
+  const loadProjects = async () => {
+    const data = await apiRequest('/api/projects', {}, authToken)
+    const projects = Array.isArray(data?.projects) ? data.projects : []
+    setUserProjects(projects)
+
+    return projects
   }
 
   useEffect(() => {
@@ -135,13 +148,46 @@ function App() {
     if (!isAuthenticated) {
       setMenuData(emptyMenu)
       setFavoriteDishIds([])
+      setUserProjects([])
       setPageError('')
       setIsLoading(false)
+      setProjectsReady(false)
       return
     }
 
-    loadMenuData()
-    loadFavoriteDishIds()
+    const loadInitialData = async () => {
+      setIsLoading(true)
+      setProjectsReady(false)
+      setPageError('')
+
+      try {
+        const projects = await loadProjects()
+
+        if (!isAdmin && projects.length === 0) {
+          setMenuData(emptyMenu)
+          setFavoriteDishIds([])
+          return
+        }
+
+        const [menu, favorites] = await Promise.all([
+          apiRequest('/api/menu', {}, authToken),
+          apiRequest('/api/favorites', {}, authToken),
+        ])
+
+        setMenuData(menu)
+        const ids = Array.isArray(favorites?.dishIds)
+          ? favorites.dishIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)
+          : []
+        setFavoriteDishIds(ids)
+      } catch (error) {
+        setPageError(error.message)
+      } finally {
+        setIsLoading(false)
+        setProjectsReady(true)
+      }
+    }
+
+    loadInitialData()
   }, [authReady, isAuthenticated, authToken])
 
   const handleAuthSubmit = async ({ email, password, displayName, mode }) => {
@@ -309,6 +355,80 @@ function App() {
     return apiRequest('/api/activity-logs/unread-count', {}, authToken)
   }
 
+  const refreshProjectScopedData = async () => {
+    const [menu, favorites, projects] = await Promise.all([
+      apiRequest('/api/menu', {}, authToken),
+      apiRequest('/api/favorites', {}, authToken),
+      apiRequest('/api/projects', {}, authToken),
+    ])
+
+    setMenuData(menu)
+    setFavoriteDishIds(Array.isArray(favorites?.dishIds) ? favorites.dishIds : [])
+    setUserProjects(Array.isArray(projects?.projects) ? projects.projects : [])
+  }
+
+  const handleCreateProject = async (name) => {
+    const payload = await apiRequest(
+      '/api/projects',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      },
+      authToken,
+    )
+
+    if (payload?.user) {
+      setCurrentUser(payload.user)
+    }
+
+    await refreshProjectScopedData()
+    return payload.project
+  }
+
+  const handleSwitchCurrentProject = async (projectId) => {
+    const user = await apiRequest(
+      '/api/projects/current',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ projectId }),
+      },
+      authToken,
+    )
+
+    setCurrentUser(user)
+    await refreshProjectScopedData()
+    return user
+  }
+
+  const handleLoadCurrentProject = async () => {
+    return apiRequest('/api/projects/current', {}, authToken)
+  }
+
+  const handleInviteToCurrentProject = async (email) => {
+    return apiRequest(
+      '/api/projects/current/invite',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      },
+      authToken,
+    )
+  }
+
+  const handleLoadCurrentProjectMembers = async () => {
+    return apiRequest('/api/projects/current/members', {}, authToken)
+  }
+
+  const handleRemoveMemberFromCurrentProject = async (userId) => {
+    return apiRequest(
+      `/api/projects/current/members/${userId}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+  }
+
   const handleToggleFavoriteDish = async (dishId, isCurrentlyFavorite) => {
     if (!isAuthenticated) {
       throw new Error('Потрібна авторизація')
@@ -365,8 +485,20 @@ function App() {
       return <main className="category-page"><p className="state-message">Перевірка доступу...</p></main>
     }
 
+    if (isAuthenticated && !projectsReady) {
+      return <main className="category-page"><p className="state-message">Завантаження проєкту...</p></main>
+    }
+
     if (!isAuthenticated) {
       return <Navigate to="/login" replace />
+    }
+
+    if (hasProjectAccess && location.pathname === '/no-project') {
+      return <Navigate to="/" replace />
+    }
+
+    if (!hasProjectAccess && location.pathname !== '/profile' && location.pathname !== '/no-project') {
+      return <Navigate to="/no-project" replace />
     }
 
     return element
@@ -380,6 +512,7 @@ function App() {
           typeCategories={menuData.typeCategories}
           currentUser={currentUser}
           isAdmin={isAdmin}
+          hasProjectAccess={hasProjectAccess}
           showCategoryControls={showCategoryControls}
           onLogout={handleLogout}
           onOpenAddCategory={openAddCategoryModal}
@@ -492,14 +625,36 @@ function App() {
         <Route
           path="/profile"
           element={protectedContent(
-            <ProfilePage currentUser={currentUser} onUpdateProfile={handleUpdateProfile} />,
+            <ProfilePage
+              currentUser={currentUser}
+              projects={userProjects}
+              onUpdateProfile={handleUpdateProfile}
+              onCreateProject={handleCreateProject}
+              onSwitchProject={handleSwitchCurrentProject}
+            />,
           )}
+        />
+        <Route
+          path="/project"
+          element={protectedContent(
+            <CurrentProjectPage
+              currentUser={currentUser}
+              onLoadCurrentProject={handleLoadCurrentProject}
+              onInviteToCurrentProject={handleInviteToCurrentProject}
+              onLoadCurrentProjectMembers={handleLoadCurrentProjectMembers}
+              onRemoveMemberFromCurrentProject={handleRemoveMemberFromCurrentProject}
+            />,
+          )}
+        />
+        <Route
+          path="/no-project"
+          element={protectedContent(<NoProjectAccessPage />)}
         />
         <Route
           path="/login"
           element={
             isAuthenticated
-              ? <Navigate to="/" replace />
+              ? <Navigate to={hasProjectAccess ? '/' : '/no-project'} replace />
               : <AuthPage mode="login" onSubmitAuth={handleAuthSubmit} />
           }
         />
@@ -507,7 +662,7 @@ function App() {
           path="/register"
           element={
             isAuthenticated
-              ? <Navigate to="/" replace />
+              ? <Navigate to={hasProjectAccess ? '/' : '/no-project'} replace />
               : <AuthPage mode="register" onSubmitAuth={handleAuthSubmit} />
           }
         />

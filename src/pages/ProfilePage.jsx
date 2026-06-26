@@ -13,7 +13,14 @@ const defaultAvatarUrls = [
   '/default-avatars/avatar-10.svg',
 ]
 
-export default function ProfilePage({ currentUser, onUpdateProfile }) {
+export default function ProfilePage({
+  currentUser,
+  projects = [],
+  onUpdateProfile,
+  onCreateProject,
+  onSwitchProject,
+}) {
+  const canManageProjects = currentUser?.role === 'ADMIN'
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -23,6 +30,11 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
   const [formMessage, setFormMessage] = useState('')
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [newProjectName, setNewProjectName] = useState('')
+  const [projectMessage, setProjectMessage] = useState('')
+  const [projectError, setProjectError] = useState('')
+  const [isProjectSubmitting, setIsProjectSubmitting] = useState(false)
 
   useEffect(() => {
     if (!currentUser) {
@@ -32,6 +44,7 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
     setDisplayName(currentUser.displayName || '')
     setEmail(currentUser.email || '')
     setAvatarDataUrl(currentUser.avatarUrl || '')
+    setSelectedProjectId(currentUser.currentProjectId ? String(currentUser.currentProjectId) : '')
   }, [currentUser])
 
   const submit = async (event) => {
@@ -71,6 +84,54 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
       setFormError(error.message)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const submitProjectSwitch = async (event) => {
+    event.preventDefault()
+    setProjectError('')
+    setProjectMessage('')
+
+    if (!selectedProjectId) {
+      setProjectError('Оберіть поточний проєкт')
+      return
+    }
+
+    setIsProjectSubmitting(true)
+
+    try {
+      await onSwitchProject?.(Number(selectedProjectId))
+      setProjectMessage('Поточний проєкт змінено')
+    } catch (error) {
+      setProjectError(error.message)
+    } finally {
+      setIsProjectSubmitting(false)
+    }
+  }
+
+  const submitCreateProject = async (event) => {
+    event.preventDefault()
+    setProjectError('')
+    setProjectMessage('')
+
+    if (!newProjectName.trim()) {
+      setProjectError('Назва проєкту обовʼязкова')
+      return
+    }
+
+    setIsProjectSubmitting(true)
+
+    try {
+      const project = await onCreateProject?.(newProjectName.trim())
+      setNewProjectName('')
+      if (project?.id) {
+        setSelectedProjectId(String(project.id))
+      }
+      setProjectMessage('Новий проєкт створено')
+    } catch (error) {
+      setProjectError(error.message)
+    } finally {
+      setIsProjectSubmitting(false)
     }
   }
 
@@ -159,6 +220,50 @@ export default function ProfilePage({ currentUser, onUpdateProfile }) {
         {formError ? <p className="state-message state-message--error">{formError}</p> : null}
         {formMessage ? <p className="state-message">{formMessage}</p> : null}
       </section>
+
+      {canManageProjects ? (
+        <section className="admin-panel" aria-label="Керування проєктами">
+          <h2>проєкти</h2>
+
+          <form className="admin-form" onSubmit={submitProjectSwitch}>
+            <label htmlFor="profile-project-select">Поточний проєкт</label>
+            <select
+              id="profile-project-select"
+              value={selectedProjectId}
+              onChange={(event) => setSelectedProjectId(event.target.value)}
+            >
+              <option value="">Оберіть проєкт</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+
+            <button type="submit" disabled={isProjectSubmitting || !projects.length}>
+              {isProjectSubmitting ? 'Зберігаю...' : 'Змінити поточний проєкт'}
+            </button>
+          </form>
+
+          <form className="admin-form" onSubmit={submitCreateProject}>
+            <label htmlFor="profile-new-project">Створити новий проєкт</label>
+            <input
+              id="profile-new-project"
+              type="text"
+              value={newProjectName}
+              onChange={(event) => setNewProjectName(event.target.value)}
+              maxLength={80}
+              placeholder="Назва проєкту"
+            />
+            <button type="submit" disabled={isProjectSubmitting}>
+              {isProjectSubmitting ? 'Створюю...' : 'Створити проєкт'}
+            </button>
+          </form>
+
+          {projectError ? <p className="state-message state-message--error">{projectError}</p> : null}
+          {projectMessage ? <p className="state-message">{projectMessage}</p> : null}
+        </section>
+      ) : null}
     </main>
   )
 }

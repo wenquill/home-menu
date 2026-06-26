@@ -4,29 +4,51 @@ import express from 'express'
 import jwt from 'jsonwebtoken'
 import {
   addFavoriteDishForUser,
+  addFavoriteDishForUserInProject,
+  addProjectMembership,
+  countProjectMembers,
   createUser,
   createActivityLog,
   createCategory,
+  createCategoryInProject,
   createDish,
+  createDishInProject,
   createMenuEntry,
+  createMenuEntryInProject,
+  createProject,
   deleteDish,
   deleteMenuEntryById,
   getDishById,
+  getDishByIdInProject,
   getMenuEntryById,
   getCategories,
+  getCategoriesByProject,
   getCategoryById,
+  getCategoryByIdInProject,
   getMenuEntriesByDate,
+  getMenuEntriesByDateInProject,
+  getProjectById,
+  getProjectRoleForUser,
+  getProjectsForUser,
+  getProjectMembers,
   getRecentActivityLogsForUser,
   getUnreadActivityLogsCountForUser,
   markActivityLogsAsReadForUser,
   getDishes,
+  getDishesByProject,
   getFavoriteDishIdsForUser,
+  getFavoriteDishIdsForUserInProject,
+  isUserInProject,
   getUserByEmail,
   getUserById,
   initializeDatabase,
   removeFavoriteDishForUser,
+  removeFavoriteDishForUserInProject,
+  removeProjectMembership,
+  setCurrentProjectForUser,
   updateUserById,
   updateDish,
+  updateDishInProject,
 } from './db.js'
 
 initializeDatabase()
@@ -71,6 +93,52 @@ function authRequired(req, res, next) {
 function adminRequired(req, res, next) {
   if (!req.user || req.user.role !== 'ADMIN') {
     return res.status(403).json({ message: 'Доступ лише для адміністратора' })
+  }
+
+  return next()
+}
+
+function resolveCurrentProjectId(user) {
+  const preferredProjectId = Number(user?.currentProjectId)
+  if (Number.isInteger(preferredProjectId) && preferredProjectId > 0) {
+    return preferredProjectId
+  }
+
+  const projects = getProjectsForUser(user.id)
+  return projects[0]?.id || null
+}
+
+function projectAccessRequired(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Потрібна авторизація' })
+  }
+
+  const projectId = resolveCurrentProjectId(req.user)
+
+  if (!projectId) {
+    return res.status(403).json({ message: 'Вас ще не запрошено в жоден проєкт' })
+  }
+
+  if (!isUserInProject(req.user.id, projectId)) {
+    return res.status(403).json({ message: 'Ви не маєте доступу до поточного проєкту' })
+  }
+
+  req.projectId = projectId
+  return next()
+}
+
+function projectOwnerOrAdminRequired(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Потрібна авторизація' })
+  }
+
+  if (req.user.role === 'ADMIN') {
+    return next()
+  }
+
+  const role = getProjectRoleForUser(req.user.id, req.projectId)
+  if (role !== 'OWNER') {
+    return res.status(403).json({ message: 'Потрібні права власника проєкту' })
   }
 
   return next()
@@ -157,6 +225,7 @@ app.post('/api/auth/login', async (req, res) => {
     email: user.email,
     displayName: user.displayName,
     role: user.role,
+    currentProjectId: user.currentProjectId || null,
     avatarUrl: user.avatarUrl,
   }
   const token = signUserToken(authUser)
@@ -166,6 +235,117 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.get('/api/auth/me', authRequired, (req, res) => {
   return res.json(req.user)
+})
+
+app.get('/api/projects', authRequired, (req, res) => {
+  const projects = getProjectsForUser(req.user.id)
+  return res.json({
+    currentProjectId: req.user.currentProjectId || null,
+    projects,
+  })
+})
+
+app.post('/api/projects', authRequired, adminRequired, (req, res) => {
+  const name = String(req.body.name || '').trim()
+
+  if (!name) {
+    return res.status(400).json({ message: 'Назва проєкту обовʼязкова' })
+  }
+
+  if (name.length > 80) {
+    return res.status(400).json({ message: 'Назва проєкту має бути не довшою за 80 символів' })
+  }
+
+  const project = createProject({
+    name,
+    createdByUserId: req.user.id,
+  })
+
+  const freshUser = getUserById(req.user.id)
+
+  return res.status(201).json({
+    project,
+    user: freshUser,
+  })
+})
+
+app.put('/api/projects/current', authRequired, adminRequired, (req, res) => {
+  const projectId = Number(req.body.projectId)
+
+  if (Number.isNaN(projectId)) {
+    return res.status(400).json({ message: 'Некоректний projectId' })
+  }
+
+  if (!isUserInProject(req.user.id, projectId)) {
+    return res.status(403).json({ message: 'Ви не маєте доступу до цього проєкту' })
+  }
+
+  const updatedUser = setCurrentProjectForUser(req.user.id, projectId)
+  return res.json(updatedUser)
+})
+
+app.get('/api/projects/current', authRequired, projectAccessRequired, (req, res) => {
+  const project = getProjectById(req.projectId)
+
+  if (!project) {
+    return res.status(404).json({ message: 'Поточний проєкт не знайдено' })
+  }
+
+  return res.json({
+    ...project,
+    role: getProjectRoleForUser(req.user.id, req.projectId),
+    memberCount: countProjectMembers(req.projectId),
+  })
+})
+
+app.post('/api/projects/current/invite', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
+  const email = String(req.body.email || '').trim().toLowerCase()
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ message: 'Вкажіть коректний email користувача' })
+  }
+
+  const invitedUser = getUserByEmail(email)
+  if (!invitedUser) {
+    return res.status(404).json({ message: 'Користувача з таким email не знайдено' })
+  }
+
+  addProjectMembership({
+    userId: invitedUser.id,
+    projectId: req.projectId,
+    role: 'MEMBER',
+  })
+
+  return res.json({ success: true })
+})
+
+app.get('/api/projects/current/members', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
+  const members = getProjectMembers(req.projectId)
+  return res.json({ members })
+})
+
+app.delete('/api/projects/current/members/:userId', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
+  const userId = Number(req.params.userId)
+
+  if (!Number.isInteger(userId) || userId < 1) {
+    return res.status(400).json({ message: 'Некоректний userId' })
+  }
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ message: 'Ви не можете видалити себе з поточного проєкту' })
+  }
+
+  const result = removeProjectMembership(userId, req.projectId)
+
+  if (!result?.removed && result?.reason === 'LAST_OWNER') {
+    return res.status(400).json({ message: 'Не можна видалити останнього власника проєкту' })
+  }
+
+  if (!result?.removed) {
+    return res.status(404).json({ message: 'Учасника не знайдено в поточному проєкті' })
+  }
+
+  return res.status(204).send()
 })
 
 app.put('/api/profile', authRequired, async (req, res) => {
@@ -242,19 +422,19 @@ app.put('/api/profile', authRequired, async (req, res) => {
   return res.json(updatedUser)
 })
 
-app.get('/api/menu', (_req, res) => {
-  const categories = getCategories()
+app.get('/api/menu', authRequired, projectAccessRequired, (req, res) => {
+  const categories = getCategoriesByProject(req.projectId)
   const mealCategories = categories.filter((item) => item.kind === 'MEAL')
   const typeCategories = categories.filter((item) => item.kind === 'TYPE')
 
   res.json({
     mealCategories,
     typeCategories,
-    dishes: getDishes(),
+    dishes: getDishesByProject(req.projectId),
   })
 })
 
-app.get('/api/activity-logs', authRequired, (req, res) => {
+app.get('/api/activity-logs', authRequired, projectAccessRequired, (req, res) => {
   const limit = req.query.limit ? Number(req.query.limit) : 60
   const markAsRead = req.query.markAsRead !== 'false'
 
@@ -272,21 +452,21 @@ app.get('/api/activity-logs', authRequired, (req, res) => {
   return res.json(logs)
 })
 
-app.get('/api/activity-logs/unread-count', authRequired, (req, res) => {
+app.get('/api/activity-logs/unread-count', authRequired, projectAccessRequired, (req, res) => {
   return res.json({ count: getUnreadActivityLogsCountForUser(req.user.id) })
 })
 
-app.get('/api/categories', (req, res) => {
+app.get('/api/categories', authRequired, projectAccessRequired, (req, res) => {
   const kind = req.query.kind
 
   if (kind && kind !== 'MEAL' && kind !== 'TYPE') {
     return res.status(400).json({ message: 'kind має бути MEAL або TYPE' })
   }
 
-  return res.json(getCategories(kind))
+  return res.json(getCategoriesByProject(req.projectId, kind))
 })
 
-app.post('/api/categories', authRequired, adminRequired, (req, res) => {
+app.post('/api/categories', authRequired, projectAccessRequired, adminRequired, (req, res) => {
   const name = String(req.body.name || '').trim()
   const kind = String(req.body.kind || '').trim().toUpperCase()
 
@@ -299,7 +479,7 @@ app.post('/api/categories', authRequired, adminRequired, (req, res) => {
   }
 
   try {
-    const category = createCategory({ name, kind })
+    const category = createCategoryInProject({ name, kind, projectId: req.projectId })
     const actorName = req.user.displayName || req.user.email
 
     addActivityLogSafe({
@@ -324,24 +504,24 @@ app.post('/api/categories', authRequired, adminRequired, (req, res) => {
   }
 })
 
-app.get('/api/dishes', (req, res) => {
+app.get('/api/dishes', authRequired, projectAccessRequired, (req, res) => {
   const categoryId = req.query.categoryId ? Number(req.query.categoryId) : null
 
   if (req.query.categoryId && Number.isNaN(categoryId)) {
     return res.status(400).json({ message: 'categoryId має бути числом' })
   }
 
-  return res.json(getDishes(categoryId))
+  return res.json(getDishesByProject(req.projectId, categoryId))
 })
 
-app.get('/api/dishes/:id', (req, res) => {
+app.get('/api/dishes/:id', authRequired, projectAccessRequired, (req, res) => {
   const dishId = Number(req.params.id)
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'Некоректний id страви' })
   }
 
-  const dish = getDishById(dishId)
+  const dish = getDishByIdInProject(dishId, req.projectId)
   if (!dish) {
     return res.status(404).json({ message: 'Страву не знайдено' })
   }
@@ -349,39 +529,39 @@ app.get('/api/dishes/:id', (req, res) => {
   return res.json(dish)
 })
 
-app.get('/api/favorites', authRequired, (req, res) => {
-  const dishIds = getFavoriteDishIdsForUser(req.user.id)
+app.get('/api/favorites', authRequired, projectAccessRequired, (req, res) => {
+  const dishIds = getFavoriteDishIdsForUserInProject(req.user.id, req.projectId)
   return res.json({ dishIds })
 })
 
-app.post('/api/favorites/:dishId', authRequired, (req, res) => {
+app.post('/api/favorites/:dishId', authRequired, projectAccessRequired, (req, res) => {
   const dishId = Number(req.params.dishId)
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'Некоректний id страви' })
   }
 
-  const dish = getDishById(dishId)
+  const dish = getDishByIdInProject(dishId, req.projectId)
   if (!dish) {
     return res.status(404).json({ message: 'Страву не знайдено' })
   }
 
-  addFavoriteDishForUser(req.user.id, dishId)
+  addFavoriteDishForUserInProject(req.user.id, dishId, req.projectId)
   return res.status(201).json({ success: true })
 })
 
-app.delete('/api/favorites/:dishId', authRequired, (req, res) => {
+app.delete('/api/favorites/:dishId', authRequired, projectAccessRequired, (req, res) => {
   const dishId = Number(req.params.dishId)
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'Некоректний id страви' })
   }
 
-  removeFavoriteDishForUser(req.user.id, dishId)
+  removeFavoriteDishForUserInProject(req.user.id, dishId, req.projectId)
   return res.json({ success: true })
 })
 
-app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
+app.post('/api/dishes', authRequired, projectAccessRequired, adminRequired, (req, res) => {
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
   const recipe = String(req.body.recipe || '').trim()
@@ -397,8 +577,8 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
     return res.status(400).json({ message: 'Категорії страви мають бути числами' })
   }
 
-  const mealCategory = getCategoryById(mealCategoryId)
-  const typeCategory = getCategoryById(typeCategoryId)
+  const mealCategory = getCategoryByIdInProject(mealCategoryId, req.projectId)
+  const typeCategory = getCategoryByIdInProject(typeCategoryId, req.projectId)
 
   if (!mealCategory || mealCategory.kind !== 'MEAL') {
     return res.status(400).json({ message: 'Некоректна категорія за часом дня' })
@@ -409,10 +589,11 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
   }
 
   try {
-    const dish = createDish({
+    const dish = createDishInProject({
       title,
       description,
       recipe,
+      projectId: req.projectId,
       mealCategoryId,
       typeCategoryId,
       components,
@@ -451,7 +632,7 @@ app.post('/api/dishes', authRequired, adminRequired, (req, res) => {
   }
 })
 
-app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
+app.put('/api/dishes/:id', authRequired, projectAccessRequired, adminRequired, (req, res) => {
   const dishId = Number(req.params.id)
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
@@ -472,13 +653,13 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
     return res.status(400).json({ message: 'Категорії страви мають бути числами' })
   }
 
-  const existingDish = getDishById(dishId)
+  const existingDish = getDishByIdInProject(dishId, req.projectId)
   if (!existingDish) {
     return res.status(404).json({ message: 'Страву не знайдено' })
   }
 
-  const mealCategory = getCategoryById(mealCategoryId)
-  const typeCategory = getCategoryById(typeCategoryId)
+  const mealCategory = getCategoryByIdInProject(mealCategoryId, req.projectId)
+  const typeCategory = getCategoryByIdInProject(typeCategoryId, req.projectId)
 
   if (!mealCategory || mealCategory.kind !== 'MEAL') {
     return res.status(400).json({ message: 'Некоректна категорія за часом дня' })
@@ -489,11 +670,12 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
   }
 
   try {
-    const dish = updateDish({
+    const dish = updateDishInProject({
       id: dishId,
       title,
       description,
       recipe,
+      projectId: req.projectId,
       mealCategoryId,
       typeCategoryId,
       components,
@@ -548,14 +730,14 @@ app.put('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
   }
 })
 
-app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
+app.delete('/api/dishes/:id', authRequired, projectAccessRequired, adminRequired, (req, res) => {
   const dishId = Number(req.params.id)
 
   if (Number.isNaN(dishId)) {
     return res.status(400).json({ message: 'Некоректний id страви' })
   }
 
-  const existingDish = getDishById(dishId)
+  const existingDish = getDishByIdInProject(dishId, req.projectId)
   if (!existingDish) {
     return res.status(404).json({ message: 'Страву не знайдено' })
   }
@@ -581,7 +763,7 @@ app.delete('/api/dishes/:id', authRequired, adminRequired, (req, res) => {
   }
 })
 
-app.get('/api/menu-plan', authRequired, (req, res) => {
+app.get('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
   const menuDate = String(req.query.date || '').trim()
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
@@ -589,13 +771,13 @@ app.get('/api/menu-plan', authRequired, (req, res) => {
   }
 
   try {
-    return res.json(getMenuEntriesByDate(menuDate))
+    return res.json(getMenuEntriesByDateInProject(menuDate, req.projectId))
   } catch (error) {
     return res.status(400).json({ message: error.message })
   }
 })
 
-app.post('/api/menu-plan', authRequired, (req, res) => {
+app.post('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
   const dishId = Number(req.body.dishId)
   const menuDate = String(req.body.menuDate || '').trim()
   const components = Array.isArray(req.body.components) ? req.body.components : undefined
@@ -609,10 +791,15 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
   }
 
   try {
-    const menuEntry = createMenuEntry({ dishId, menuDate, components })
+    const menuEntry = createMenuEntryInProject({
+      dishId,
+      projectId: req.projectId,
+      menuDate,
+      components,
+    })
     const actorName = req.user.displayName || req.user.email
 
-    const dish = getDishById(dishId)
+    const dish = getDishByIdInProject(dishId, req.projectId)
     if (dish) {
       addActivityLogSafe({
         actorUserId: req.user.id,
@@ -638,7 +825,7 @@ app.post('/api/menu-plan', authRequired, (req, res) => {
   }
 })
 
-app.delete('/api/menu-plan/:id', authRequired, (req, res) => {
+app.delete('/api/menu-plan/:id', authRequired, projectAccessRequired, (req, res) => {
   const menuEntryId = Number(req.params.id)
 
   if (Number.isNaN(menuEntryId)) {
@@ -647,6 +834,11 @@ app.delete('/api/menu-plan/:id', authRequired, (req, res) => {
 
   try {
     const menuEntry = getMenuEntryById(menuEntryId)
+
+    if (menuEntry && Number(menuEntry.projectId) !== Number(req.projectId)) {
+      return res.status(404).json({ message: 'Елемент меню не знайдено' })
+    }
+
     const deleted = deleteMenuEntryById(menuEntryId)
 
     if (!deleted) {

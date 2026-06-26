@@ -67,6 +67,7 @@ export default function TopMenu({
   typeCategories,
   currentUser,
   isAdmin,
+  hasProjectAccess,
   showCategoryControls,
   onLogout,
   onOpenAddCategory,
@@ -201,46 +202,63 @@ export default function TopMenu({
         <div className="menu-actions menu-actions--strip">
           {currentUser ? (
             <>
-              <div className="menu-strip-center">
-                <NavLink
-                  to="/"
-                  className={isDishesPageActive ? 'menu-link menu-link--active' : 'menu-link'}
-                >
-                  Страви
-                </NavLink>
-                <NavLink to="/favorites" className={linkClass}>
-                  Улюблені
-                </NavLink>
-                <NavLink to="/menu" className={linkClass}>
-                  Меню
-                </NavLink>
-                <button
-                  type="button"
-                  className="menu-link menu-link--button"
-                  onClick={() => setIsLogoutConfirmOpen(true)}
-                >
-                  вийти
-                </button>
-              </div>
+              {hasProjectAccess ? (
+                <>
+                  <div className="menu-strip-center">
+                    <NavLink
+                      to="/"
+                      className={isDishesPageActive ? 'menu-link menu-link--active' : 'menu-link'}
+                    >
+                      Страви
+                    </NavLink>
+                    <NavLink to="/menu" className={linkClass}>
+                      Меню
+                    </NavLink>
+                    <NavLink to="/favorites" className={linkClass}>
+                      Улюблені
+                    </NavLink>
+                    <NavLink to="/project" className={linkClass}>
+                      Проєкт
+                    </NavLink>
+                    <button
+                      type="button"
+                      className="menu-link menu-link--button"
+                      onClick={() => setIsLogoutConfirmOpen(true)}
+                    >
+                      вийти
+                    </button>
+                  </div>
 
-              <button
-                type="button"
-                className="menu-link menu-link--icon"
-                aria-label="Відкрити логи активності"
-                title="Логи активності"
-                onClick={() => {
-                  void openActivity()
-                }}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5L3 18v1h18v-1l-2-2zm-2 .17.59.58H6.41l.59-.58V11a5 5 0 0 1 10 0v5.17z" />
-                </svg>
-                {unreadCount > 0 ? (
-                  <span className="menu-link-notification-dot" aria-label={`Непрочитаних логів: ${unreadCount}`}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                ) : null}
-              </button>
+                  <button
+                    type="button"
+                    className="menu-link menu-link--icon"
+                    aria-label="Відкрити логи активності"
+                    title="Логи активності"
+                    onClick={() => {
+                      void openActivity()
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 1 0-14 0v5L3 18v1h18v-1l-2-2zm-2 .17.59.58H6.41l.59-.58V11a5 5 0 0 1 10 0v5.17z" />
+                    </svg>
+                    {unreadCount > 0 ? (
+                      <span className="menu-link-notification-dot" aria-label={`Непрочитаних логів: ${unreadCount}`}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+                </>
+              ) : (
+                <div className="menu-strip-center menu-strip-center--locked">
+                  <button
+                    type="button"
+                    className="menu-link menu-link--button"
+                    onClick={() => setIsLogoutConfirmOpen(true)}
+                  >
+                    вийти
+                  </button>
+                </div>
+              )}
 
               <NavLink to="/profile" className={profileLinkClass}>
                 <img
