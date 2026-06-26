@@ -3,6 +3,11 @@ import { NavLink } from 'react-router-dom'
 const linkClass = ({ isActive }) =>
   isActive ? 'menu-link menu-link--active' : 'menu-link'
 
+const profileLinkClass = ({ isActive }) =>
+  isActive
+    ? 'menu-link menu-link--active menu-link--profile'
+    : 'menu-link menu-link--profile'
+
 function MenuGroup({ title, categories }) {
   return (
     <div className="menu-group">
@@ -27,34 +32,28 @@ export default function TopMenu({
   typeCategories,
   currentUser,
   isAdmin,
+  showCategoryControls,
   onLogout,
 }) {
   return (
-    <header className="top-menu">
-      <div className="menu-actions">
-        {isAdmin ? (
-          <>
-            <NavLink to="/add-category" className={linkClass}>
-              + Додати категорію
-            </NavLink>
-            <NavLink to="/add-dish" className={linkClass}>
-              + Додати страву
-            </NavLink>
-          </>
-        ) : null}
-
+    <>
+      <header className="top-menu top-menu--strip">
+        <div className="menu-actions menu-actions--strip">
         {currentUser ? (
           <>
-            <NavLink to="/profile" className={linkClass}>
+            <NavLink to="/" className={linkClass}>
+              Страви
+            </NavLink>
+            <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
+              Вийти ({currentUser.role === 'ADMIN' ? 'admin' : 'user'})
+            </button>
+            <NavLink to="/profile" className={profileLinkClass}>
               <img
                 src={currentUser.avatarUrl || '/avatar-placeholder.svg'}
                 alt="Профіль"
                 className="menu-avatar"
               />
             </NavLink>
-            <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
-              Вийти ({currentUser.role === 'ADMIN' ? 'admin' : 'user'})
-            </button>
           </>
         ) : (
           <>
@@ -66,9 +65,26 @@ export default function TopMenu({
             </NavLink>
           </>
         )}
-      </div>
-      <MenuGroup title="За часом дня" categories={mealCategories} />
-      <MenuGroup title="За видом страв" categories={typeCategories} />
-    </header>
+        </div>
+      </header>
+
+      {showCategoryControls ? (
+        <section className="top-menu top-menu--categories">
+          {isAdmin ? (
+            <div className="menu-actions menu-actions--categories">
+              <NavLink to="/add-category" className={linkClass}>
+                + Додати категорію
+              </NavLink>
+              <NavLink to="/add-dish" className={linkClass}>
+                + Додати страву
+              </NavLink>
+            </div>
+          ) : null}
+
+          <MenuGroup title="За часом дня" categories={mealCategories} />
+          <MenuGroup title="За видом страв" categories={typeCategories} />
+        </section>
+      ) : null}
+    </>
   )
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import TopMenu from './components/TopMenu'
 import AddCategoryPage from './pages/AddCategoryPage'
 import AddDishPage from './pages/AddDishPage'
@@ -42,6 +42,7 @@ async function apiRequest(path, options = {}, token = '') {
 }
 
 function App() {
+  const location = useLocation()
   const [menuData, setMenuData] = useState(emptyMenu)
   const [isLoading, setIsLoading] = useState(true)
   const [pageError, setPageError] = useState('')
@@ -51,6 +52,8 @@ function App() {
   const isAuthenticated = Boolean(currentUser)
 
   const isAdmin = currentUser?.role === 'ADMIN'
+  const showCategoryControls =
+    location.pathname === '/' || location.pathname.startsWith('/category/')
 
   const defaultCategoryId =
     menuData.mealCategories[0]?.id ?? menuData.typeCategories[0]?.id ?? null
@@ -222,6 +225,7 @@ function App() {
           typeCategories={menuData.typeCategories}
           currentUser={currentUser}
           isAdmin={isAdmin}
+          showCategoryControls={showCategoryControls}
           onLogout={handleLogout}
         />
       ) : null}
