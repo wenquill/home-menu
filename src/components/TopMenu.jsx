@@ -75,6 +75,7 @@ export default function TopMenu({
   onLoadUnreadActivityCount,
 }) {
   const [isActivityOpen, setIsActivityOpen] = useState(false)
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false)
   const [activityLogs, setActivityLogs] = useState([])
   const [isActivityLoading, setIsActivityLoading] = useState(false)
   const [activityError, setActivityError] = useState('')
@@ -107,19 +108,20 @@ export default function TopMenu({
   }, [activityLogs])
 
   useEffect(() => {
-    if (!isActivityOpen) {
+    if (!isActivityOpen && !isLogoutConfirmOpen) {
       return undefined
     }
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         setIsActivityOpen(false)
+        setIsLogoutConfirmOpen(false)
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isActivityOpen])
+  }, [isActivityOpen, isLogoutConfirmOpen])
 
   useEffect(() => {
     if (!currentUser || !onLoadUnreadActivityCount) {
@@ -202,7 +204,11 @@ export default function TopMenu({
                 <NavLink to="/menu" className={linkClass}>
                   Меню
                 </NavLink>
-                <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
+                <button
+                  type="button"
+                  className="menu-link menu-link--button"
+                  onClick={() => setIsLogoutConfirmOpen(true)}
+                >
                   вийти
                 </button>
               </div>
@@ -339,6 +345,46 @@ export default function TopMenu({
                 })}
               </ul>
             ) : null}
+          </section>
+        </div>
+      ) : null}
+
+      {isLogoutConfirmOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={() => setIsLogoutConfirmOpen(false)}>
+          <section
+            className="dish-modal dish-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Підтвердження виходу"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="dish-modal-close"
+              aria-label="Закрити"
+              onClick={() => setIsLogoutConfirmOpen(false)}
+            >
+              ×
+            </button>
+
+            <h2>вийти з акаунту?</h2>
+            <p className="dish-modal-warning">Потрібно підтвердження, щоб завершити поточну сесію.</p>
+
+            <div className="dish-modal-actions dish-modal-actions--confirm">
+              <button type="button" className="dish-modal-secondary" onClick={() => setIsLogoutConfirmOpen(false)}>
+                скасувати
+              </button>
+              <button
+                type="button"
+                className="dish-modal-danger"
+                onClick={() => {
+                  setIsLogoutConfirmOpen(false)
+                  onLogout()
+                }}
+              >
+                вийти
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
