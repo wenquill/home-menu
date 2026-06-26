@@ -523,15 +523,17 @@ export default function CategoryPage({
             aria-label={`Страва ${selectedDish.title}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="dish-modal-close"
-              aria-label="Закрити"
-              onClick={closeModals}
-            >
-              ×
-            </button>
-            <h2>{selectedDish.title}</h2>
+            <div className="dish-modal-header">
+              <h2>{selectedDish.title}</h2>
+              <button
+                type="button"
+                className="dish-modal-close"
+                aria-label="Закрити"
+                onClick={closeModals}
+              >
+                ×
+              </button>
+            </div>
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
             {selectedDish.recipe ? (
               <div className="dish-recipe-block">
@@ -574,22 +576,23 @@ export default function CategoryPage({
       {selectedDish && isEditModalOpen ? (
         <div className="dish-modal-overlay" role="presentation" onClick={closeModals}>
           <section
-            className="dish-modal"
+            className="dish-modal dish-modal--edit"
             role="dialog"
             aria-modal="true"
             aria-label={`Редагування страви ${selectedDish.title}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="dish-modal-close"
-              aria-label="Закрити"
-              onClick={closeModals}
-            >
-              ×
-            </button>
-
-            <h2>Редагувати страву</h2>
+            <div className="dish-modal-header">
+              <h2>Редагувати страву</h2>
+              <button
+                type="button"
+                className="dish-modal-close"
+                aria-label="Закрити"
+                onClick={closeModals}
+              >
+                ×
+              </button>
+            </div>
 
             <form className="dish-modal-form" onSubmit={submitEdit}>
               <label htmlFor="edit-dish-title">назва</label>
@@ -692,16 +695,17 @@ export default function CategoryPage({
             aria-label={`Видалити страву ${dishToDelete.title}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="dish-modal-close"
-              aria-label="Закрити"
-              onClick={closeModals}
-            >
-              ×
-            </button>
-
-            <h2>Видалити страву?</h2>
+            <div className="dish-modal-header">
+              <h2>Видалити страву?</h2>
+              <button
+                type="button"
+                className="dish-modal-close"
+                aria-label="Закрити"
+                onClick={closeModals}
+              >
+                ×
+              </button>
+            </div>
             <p className="dish-modal-warning">
               Страва <strong>{dishToDelete.title}</strong> буде видалена назавжди.
             </p>
@@ -729,11 +733,12 @@ export default function CategoryPage({
             aria-label={`Додати ${menuScheduleDish.title} до меню`}
             onClick={(event) => event.stopPropagation()}
           >
-            <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeScheduleMenuModal}>
-              ×
-            </button>
-
-            <h2>додати до меню</h2>
+            <div className="dish-modal-header">
+              <h2>додати до меню</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeScheduleMenuModal}>
+                ×
+              </button>
+            </div>
             <p className="dish-modal-warning">
               Оберіть, на яку дату запланувати страву <strong>{menuScheduleDish.title}</strong>.
             </p>

@@ -293,15 +293,17 @@ export default function TopMenu({
             aria-label="Логи активності"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="dish-modal-close"
-              aria-label="Закрити"
-              onClick={() => setIsActivityOpen(false)}
-            >
-              ×
-            </button>
-            <h2>логи активності</h2>
+            <div className="dish-modal-header">
+              <h2>логи активності</h2>
+              <button
+                type="button"
+                className="dish-modal-close"
+                aria-label="Закрити"
+                onClick={() => setIsActivityOpen(false)}
+              >
+                ×
+              </button>
+            </div>
 
             {isActivityLoading ? <p className="state-message">завантаження логів...</p> : null}
             {activityError ? <p className="state-message state-message--error">{activityError}</p> : null}
@@ -371,16 +373,17 @@ export default function TopMenu({
             aria-label="Підтвердження виходу"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              className="dish-modal-close"
-              aria-label="Закрити"
-              onClick={() => setIsLogoutConfirmOpen(false)}
-            >
-              ×
-            </button>
-
-            <h2>вийти з акаунту?</h2>
+            <div className="dish-modal-header">
+              <h2>вийти з акаунту?</h2>
+              <button
+                type="button"
+                className="dish-modal-close"
+                aria-label="Закрити"
+                onClick={() => setIsLogoutConfirmOpen(false)}
+              >
+                ×
+              </button>
+            </div>
             <p className="dish-modal-warning">Потрібно підтвердження, щоб завершити поточну сесію.</p>
 
             <div className="dish-modal-actions dish-modal-actions--confirm">

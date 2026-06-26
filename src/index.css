@@ -523,7 +523,9 @@ body {
 
 .activity-modal {
   width: min(700px, 100%);
-  max-height: min(75svh, 720px);
+  height: min(78svh, 700px);
+  min-height: min(420px, calc(100svh - 36px));
+  max-height: min(90svh, calc(100svh - 36px));
   display: flex;
   flex-direction: column;
 }
@@ -532,7 +534,7 @@ body {
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
-  overflow: auto;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -841,9 +843,8 @@ body {
 }
 
 .dish-modal-close {
-  position: sticky;
-  top: 10px;
-  align-self: flex-end;
+  position: absolute;
+  right: 15px;
   width: 32px;
   height: 32px;
   border-radius: 999px;
@@ -852,6 +853,28 @@ body {
   cursor: pointer;
   font-size: 22px;
   line-height: 1;
+}
+
+.dish-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.dish-modal-header h2 {
+  margin: 0;
+}
+
+.dish-modal-header .dish-modal-close {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.dish-modal--edit .dish-modal-form {
+  margin-top: 10px;
 }
 
 .dish-modal-form {

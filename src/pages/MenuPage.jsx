@@ -258,10 +258,12 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
             aria-label={`Страва ${selectedDish.title}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeModals}>
-              ×
-            </button>
-            <h2>{selectedDish.title}</h2>
+            <div className="dish-modal-header">
+              <h2>{selectedDish.title}</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeModals}>
+                ×
+              </button>
+            </div>
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
             {selectedDish.recipe ? (
               <div className="dish-recipe-block">
