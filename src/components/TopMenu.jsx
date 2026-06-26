@@ -34,6 +34,8 @@ export default function TopMenu({
   isAdmin,
   showCategoryControls,
   onLogout,
+  onOpenAddCategory,
+  onOpenAddDish,
 }) {
   return (
     <>
@@ -75,12 +77,12 @@ export default function TopMenu({
         <section className="top-menu top-menu--categories">
           {isAdmin ? (
             <div className="menu-actions menu-actions--categories">
-              <NavLink to="/add-category" className={linkClass}>
-                + Додати категорію
-              </NavLink>
-              <NavLink to="/add-dish" className={linkClass}>
-                + Додати страву
-              </NavLink>
+              <button type="button" className="menu-link menu-link--button" onClick={onOpenAddCategory}>
+                + додати категорію
+              </button>
+              <button type="button" className="menu-link menu-link--button" onClick={onOpenAddDish}>
+                + додати страву
+              </button>
             </div>
           ) : null}
 

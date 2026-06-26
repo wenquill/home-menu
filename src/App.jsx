@@ -59,6 +59,8 @@ function App() {
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || '')
   const [currentUser, setCurrentUser] = useState(null)
   const [authReady, setAuthReady] = useState(false)
+  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false)
+  const [isAddDishModalOpen, setIsAddDishModalOpen] = useState(false)
   const isAuthenticated = Boolean(currentUser)
 
   const isAdmin = currentUser?.role === 'ADMIN'
@@ -146,7 +148,25 @@ function App() {
     localStorage.removeItem('authToken')
     setAuthToken('')
     setCurrentUser(null)
+    setIsAddCategoryModalOpen(false)
+    setIsAddDishModalOpen(false)
   }
+
+  useEffect(() => {
+    if (!isAddCategoryModalOpen && !isAddDishModalOpen) {
+      return undefined
+    }
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsAddCategoryModalOpen(false)
+        setIsAddDishModalOpen(false)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isAddCategoryModalOpen, isAddDishModalOpen])
 
   const handleUpdateProfile = async (payload) => {
     const updatedUser = await apiRequest(
@@ -224,6 +244,29 @@ function App() {
     await loadMenuData({ background: true })
   }
 
+  const openAddCategoryModal = () => {
+    if (!isAdmin) {
+      return
+    }
+
+    setIsAddDishModalOpen(false)
+    setIsAddCategoryModalOpen(true)
+  }
+
+  const openAddDishModal = () => {
+    if (!isAdmin) {
+      return
+    }
+
+    setIsAddCategoryModalOpen(false)
+    setIsAddDishModalOpen(true)
+  }
+
+  const closeAddModals = () => {
+    setIsAddCategoryModalOpen(false)
+    setIsAddDishModalOpen(false)
+  }
+
   const emptyStateElement = (
     <main className="category-page">
       <h1>Категорії ще не створені</h1>
@@ -253,6 +296,8 @@ function App() {
           isAdmin={isAdmin}
           showCategoryControls={showCategoryControls}
           onLogout={handleLogout}
+          onOpenAddCategory={openAddCategoryModal}
+          onOpenAddDish={openAddDishModal}
         />
       ) : null}
 
@@ -355,6 +400,62 @@ function App() {
           )}
         />
       </Routes>
+
+      {isAuthenticated && isAdmin && isAddCategoryModalOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeAddModals}>
+          <section
+            className="dish-modal admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Додати категорію"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="dish-modal-close"
+              aria-label="Закрити"
+              onClick={closeAddModals}
+            >
+              ×
+            </button>
+            <AddCategoryPage
+              onAddCategory={handleAddCategory}
+              embedded
+              onClose={closeAddModals}
+              onSuccess={closeAddModals}
+            />
+          </section>
+        </div>
+      ) : null}
+
+      {isAuthenticated && isAdmin && isAddDishModalOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeAddModals}>
+          <section
+            className="dish-modal admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Додати страву"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="dish-modal-close"
+              aria-label="Закрити"
+              onClick={closeAddModals}
+            >
+              ×
+            </button>
+            <AddDishPage
+              mealCategories={menuData.mealCategories}
+              typeCategories={menuData.typeCategories}
+              onAddDish={handleAddDish}
+              embedded
+              onClose={closeAddModals}
+              onSuccess={closeAddModals}
+            />
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

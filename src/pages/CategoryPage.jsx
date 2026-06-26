@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 
-function DishCard({ title, description, isAdmin, onOpen, onEdit, onDelete }) {
+function DishCard({ id, title, description, isAdmin, onOpen, onEdit, onDelete }) {
+  const cornerOffsets = [
+    { x: '10%', y: '10%' },
+    { x: '90%', y: '10%' },
+    { x: '10%', y: '90%' },
+    { x: '90%', y: '90%' },
+  ]
+  const spotSizes = ['34%', '40%', '46%', '52%']
+  const corner = cornerOffsets[id % cornerOffsets.length]
+  const spotSize = spotSizes[(id * 7) % spotSizes.length]
+
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -12,6 +22,11 @@ function DishCard({ title, description, isAdmin, onOpen, onEdit, onDelete }) {
   return (
     <article
       className="dish-card dish-card--interactive"
+      style={{
+        '--dish-spot-x': corner.x,
+        '--dish-spot-y': corner.y,
+        '--dish-spot-size': spotSize,
+      }}
       role="button"
       tabIndex={0}
       onClick={onOpen}
@@ -205,6 +220,7 @@ export default function CategoryPage({
           {filteredDishes.map((dish) => (
             <DishCard
               key={`${selectedCategoryId}-${dish.id}`}
+              id={dish.id}
               title={dish.title}
               description={dish.description}
               isAdmin={isAdmin}
@@ -293,7 +309,7 @@ export default function CategoryPage({
               >
                 {mealCategories.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name}
+                    {item.name.toLowerCase()}
                   </option>
                 ))}
               </select>
@@ -307,7 +323,7 @@ export default function CategoryPage({
               >
                 {typeCategories.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name}
+                    {item.name.toLowerCase()}
                   </option>
                 ))}
               </select>

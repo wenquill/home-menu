@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-export default function AddCategoryPage({ onAddCategory }) {
+export default function AddCategoryPage({ onAddCategory, embedded = false, onClose, onSuccess }) {
   const navigate = useNavigate()
   const [categoryName, setCategoryName] = useState('')
   const [categoryKind, setCategoryKind] = useState('MEAL')
@@ -22,8 +22,13 @@ export default function AddCategoryPage({ onAddCategory }) {
       })
 
       setCategoryName('')
-      setFormMessage('Категорію успішно додано')
-      navigate(`/category/${created.id}`)
+
+      if (embedded) {
+        onSuccess?.(created)
+      } else {
+        setFormMessage('Категорію успішно додано')
+        navigate(`/category/${created.id}`)
+      }
     } catch (error) {
       setFormError(error.message)
     } finally {
@@ -31,11 +36,11 @@ export default function AddCategoryPage({ onAddCategory }) {
     }
   }
 
-  return (
-    <main className="category-page">
-      <h1>Додати нову категорію</h1>
+  const content = (
+    <>
+      {embedded ? <h2 className="admin-modal-title">Додати нову категорію</h2> : <h1>Додати нову категорію</h1>}
 
-      <section className="admin-panel" aria-label="Форма додавання категорії">
+      <section className={embedded ? 'admin-panel admin-panel--modal' : 'admin-panel'} aria-label="Форма додавання категорії">
         <form className="admin-form" onSubmit={submitCategory}>
           <label htmlFor="category-name">Назва категорії</label>
           <input
@@ -52,18 +57,31 @@ export default function AddCategoryPage({ onAddCategory }) {
             value={categoryKind}
             onChange={(event) => setCategoryKind(event.target.value)}
           >
-            <option value="MEAL">За часом дня</option>
-            <option value="TYPE">За видом страви</option>
+            <option value="MEAL">за часом дня</option>
+            <option value="TYPE">за видом страви</option>
           </select>
 
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Зберігаю...' : 'Додати категорію'}
-          </button>
+          <div className="admin-form-actions">
+            {embedded ? (
+              <button type="button" className="dish-modal-secondary" onClick={onClose}>
+                скасувати
+              </button>
+            ) : null}
+            <button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'зберігаю...' : 'додати категорію'}
+            </button>
+          </div>
         </form>
 
         {formError ? <p className="state-message state-message--error">{formError}</p> : null}
         {formMessage ? <p className="state-message">{formMessage}</p> : null}
       </section>
-    </main>
+    </>
   )
+
+  if (embedded) {
+    return <div className="admin-modal-content">{content}</div>
+  }
+
+  return <main className="category-page">{content}</main>
 }

@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-export default function AddDishPage({ mealCategories, typeCategories, onAddDish }) {
+export default function AddDishPage({
+  mealCategories,
+  typeCategories,
+  onAddDish,
+  embedded = false,
+  onClose,
+  onSuccess,
+}) {
   const navigate = useNavigate()
   const [dishTitle, setDishTitle] = useState('')
   const [dishDescription, setDishDescription] = useState('')
@@ -37,8 +44,13 @@ export default function AddDishPage({ mealCategories, typeCategories, onAddDish 
 
       setDishTitle('')
       setDishDescription('')
-      setFormMessage('Страву успішно додано')
-      navigate(`/category/${mealCategoryId}`)
+
+      if (embedded) {
+        onSuccess?.()
+      } else {
+        setFormMessage('Страву успішно додано')
+        navigate(`/category/${mealCategoryId}`)
+      }
     } catch (error) {
       setFormError(error.message)
     } finally {
@@ -46,11 +58,11 @@ export default function AddDishPage({ mealCategories, typeCategories, onAddDish 
     }
   }
 
-  return (
-    <main className="category-page">
-      <h1>Додати нову страву</h1>
+  const content = (
+    <>
+      {embedded ? <h2 className="admin-modal-title">Додати нову страву</h2> : <h1>Додати нову страву</h1>}
 
-      <section className="admin-panel" aria-label="Форма додавання страви">
+      <section className={embedded ? 'admin-panel admin-panel--modal' : 'admin-panel'} aria-label="Форма додавання страви">
         <form className="admin-form" onSubmit={submitDish}>
           <label htmlFor="dish-title">Назва страви</label>
           <input
@@ -79,7 +91,7 @@ export default function AddDishPage({ mealCategories, typeCategories, onAddDish 
           >
             {mealCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.name.toLowerCase()}
               </option>
             ))}
           </select>
@@ -93,22 +105,35 @@ export default function AddDishPage({ mealCategories, typeCategories, onAddDish 
           >
             {typeCategories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.name}
+                {category.name.toLowerCase()}
               </option>
             ))}
           </select>
 
-          <button
-            type="submit"
-            disabled={isSubmitting || mealCategories.length === 0 || typeCategories.length === 0}
-          >
-            {isSubmitting ? 'Зберігаю...' : 'Додати страву'}
-          </button>
+          <div className="admin-form-actions">
+            {embedded ? (
+              <button type="button" className="dish-modal-secondary" onClick={onClose}>
+                скасувати
+              </button>
+            ) : null}
+            <button
+              type="submit"
+              disabled={isSubmitting || mealCategories.length === 0 || typeCategories.length === 0}
+            >
+              {isSubmitting ? 'зберігаю...' : 'додати страву'}
+            </button>
+          </div>
         </form>
 
         {formError ? <p className="state-message state-message--error">{formError}</p> : null}
         {formMessage ? <p className="state-message">{formMessage}</p> : null}
       </section>
-    </main>
+    </>
   )
+
+  if (embedded) {
+    return <div className="admin-modal-content">{content}</div>
+  }
+
+  return <main className="category-page">{content}</main>
 }
