@@ -76,10 +76,18 @@ body {
 }
 
 .menu-actions--strip {
-  position: relative;
+  display: flex;
+  align-items: center;
   min-height: 40px;
   margin-bottom: 0;
-  justify-content: center;
+  justify-content: flex-start;
+}
+
+.menu-strip-center {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .top-menu--strip .menu-link,
@@ -96,7 +104,7 @@ body {
 
 .menu-actions--categories {
   margin-bottom: 12px;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .menu-group {
@@ -109,7 +117,7 @@ body {
 
 .menu-group-title {
   margin: 0 0 8px;
-  text-align: center;
+  text-align: left;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -150,10 +158,7 @@ body {
 }
 
 .menu-link--profile {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  margin-left: auto;
   width: 40px;
   height: 40px;
   padding: 0;
@@ -172,7 +177,7 @@ body {
 }
 
 .menu-link--profile:active {
-  transform: translateY(-50%) scale(0.97);
+  transform: scale(0.97);
 }
 
 .menu-avatar {
@@ -455,11 +460,7 @@ body {
   }
 
   .menu-actions {
-    justify-content: flex-end;
-  }
-
-  .menu-actions--categories {
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .dish-grid {

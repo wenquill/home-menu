@@ -39,32 +39,35 @@ export default function TopMenu({
     <>
       <header className="top-menu top-menu--strip">
         <div className="menu-actions menu-actions--strip">
-        {currentUser ? (
-          <>
-            <NavLink to="/" className={linkClass}>
-              Страви
-            </NavLink>
-            <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
-              вийти
-            </button>
-            <NavLink to="/profile" className={profileLinkClass}>
-              <img
-                src={currentUser.avatarUrl || '/avatar-placeholder.svg'}
-                alt="Профіль"
-                className="menu-avatar"
-              />
-            </NavLink>
-          </>
-        ) : (
-          <>
-            <NavLink to="/login" className={linkClass}>
-              Увійти
-            </NavLink>
-            <NavLink to="/register" className={linkClass}>
-              Реєстрація
-            </NavLink>
-          </>
-        )}
+          {currentUser ? (
+            <>
+              <div className="menu-strip-center">
+                <NavLink to="/" className={linkClass}>
+                  Страви
+                </NavLink>
+                <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
+                  вийти
+                </button>
+              </div>
+
+              <NavLink to="/profile" className={profileLinkClass}>
+                <img
+                  src={currentUser.avatarUrl || '/avatar-placeholder.svg'}
+                  alt="Профіль"
+                  className="menu-avatar"
+                />
+              </NavLink>
+            </>
+          ) : (
+            <div className="menu-strip-center">
+              <NavLink to="/login" className={linkClass}>
+                Увійти
+              </NavLink>
+              <NavLink to="/register" className={linkClass}>
+                Реєстрація
+              </NavLink>
+            </div>
+          )}
         </div>
       </header>
 
