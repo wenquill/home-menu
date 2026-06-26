@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import bcrypt from 'bcryptjs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -86,8 +87,28 @@ function seedDishes() {
   transaction()
 }
 
+function seedAdminUser() {
+  const adminEmail = String(process.env.ADMIN_EMAIL || 'admin@home.menu').trim().toLowerCase()
+  const adminPasswordHash = String(process.env.ADMIN_PASSWORD_HASH || '').trim()
+
+  // Fallback password is admin123 for local development only.
+  const fallbackPasswordHash = bcrypt.hashSync('admin123', 10)
+
+  db.prepare(
+    'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+  ).run(adminEmail, adminPasswordHash || fallbackPasswordHash, 'ADMIN')
+}
+
 export function initializeDatabase() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('ADMIN', 'USER')),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS categories (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -110,7 +131,16 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_categories_kind ON categories(kind);
     CREATE INDEX IF NOT EXISTS idx_dishes_meal_category ON dishes(meal_category_id);
     CREATE INDEX IF NOT EXISTS idx_dishes_type_category ON dishes(type_category_id);
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
+
+  const adminCount = db
+    .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN'")
+    .get()
+
+  if (adminCount.count === 0) {
+    seedAdminUser()
+  }
 
   const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get()
 
@@ -133,6 +163,10 @@ export function getCategories(kind) {
   }
 
   return db.prepare('SELECT id, name, kind FROM categories ORDER BY id').all()
+}
+
+export function getCategoryById(id) {
+  return db.prepare('SELECT id, name, kind FROM categories WHERE id = ?').get(id)
 }
 
 export function createCategory({ name, kind }) {
@@ -184,6 +218,25 @@ export function getDishes(categoryId) {
     .all()
 }
 
+export function getDishById(id) {
+  return db
+    .prepare(
+      `SELECT
+        d.id,
+        d.title,
+        d.description,
+        d.meal_category_id AS mealCategoryId,
+        d.type_category_id AS typeCategoryId,
+        meal.name AS mealCategoryName,
+        type.name AS typeCategoryName
+       FROM dishes d
+       JOIN categories meal ON meal.id = d.meal_category_id
+       JOIN categories type ON type.id = d.type_category_id
+       WHERE d.id = ?`,
+    )
+    .get(id)
+}
+
 export function createDish({ title, description, mealCategoryId, typeCategoryId }) {
   const result = db
     .prepare(
@@ -210,6 +263,34 @@ export function createDish({ title, description, mealCategoryId, typeCategoryId 
     .get(result.lastInsertRowid)
 }
 
-export function getCategoryById(id) {
-  return db.prepare('SELECT id, name, kind FROM categories WHERE id = ?').get(id)
+export function updateDish({ id, title, description, mealCategoryId, typeCategoryId }) {
+  db.prepare(
+    `UPDATE dishes
+     SET title = ?, description = ?, meal_category_id = ?, type_category_id = ?
+     WHERE id = ?`,
+  ).run(title, description, mealCategoryId, typeCategoryId, id)
+
+  return getDishById(id)
+}
+
+export function getUserByEmail(email) {
+  return db
+    .prepare(
+      'SELECT id, email, password_hash AS passwordHash, role FROM users WHERE email = ?',
+    )
+    .get(email)
+}
+
+export function getUserById(id) {
+  return db
+    .prepare('SELECT id, email, role FROM users WHERE id = ?')
+    .get(id)
+}
+
+export function createUser({ email, passwordHash, role = 'USER' }) {
+  const result = db
+    .prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)')
+    .run(email, passwordHash, role)
+
+  return getUserById(result.lastInsertRowid)
 }

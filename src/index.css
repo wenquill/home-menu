@@ -99,6 +99,11 @@ body {
   transition: transform 150ms ease, background-color 150ms ease, color 150ms ease;
 }
 
+.menu-link--button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .menu-link:active {
   transform: scale(0.97);
 }
@@ -163,6 +168,15 @@ body {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.45;
+}
+
+.dish-edit-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .dish-card--empty {
@@ -240,6 +254,16 @@ body {
 
 .state-message--error {
   color: var(--error);
+}
+
+.auth-alt-link {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.auth-alt-link a {
+  color: var(--text);
+  font-weight: 700;
 }
 
 @media (min-width: 640px) {

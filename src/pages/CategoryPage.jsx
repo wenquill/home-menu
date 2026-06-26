@@ -1,11 +1,17 @@
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { Navigate, useParams } from 'react-router-dom'
 
-function DishCard({ title, description }) {
+function DishCard({ id, title, description, isAdmin }) {
   return (
     <article className="dish-card">
       <h3>{title}</h3>
       <p>{description}</p>
+      {isAdmin ? (
+        <Link className="dish-edit-link" to={`/edit-dish/${id}`}>
+          Редагувати
+        </Link>
+      ) : null}
     </article>
   )
 }
@@ -15,6 +21,7 @@ export default function CategoryPage({
   typeCategories,
   dishes,
   defaultCategoryId,
+  isAdmin,
 }) {
   const { categoryId } = useParams()
   const selectedCategoryId = Number(categoryId)
@@ -54,8 +61,10 @@ export default function CategoryPage({
             {filteredDishes.map((dish) => (
               <DishCard
                 key={`${selectedCategoryId}-${dish.id}`}
+                id={dish.id}
                 title={dish.title}
                 description={dish.description}
+                isAdmin={isAdmin}
               />
             ))}
           </section>
