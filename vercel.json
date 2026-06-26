@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://home-menu-63nl.onrender.com/api/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }

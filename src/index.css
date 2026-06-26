@@ -444,17 +444,48 @@ body {
 
 .dish-modal {
   width: min(520px, 100%);
+  max-height: min(90svh, calc(100svh - 36px));
   border-radius: 18px;
   border: 1px solid var(--line);
   background: #fffef8;
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.2);
   padding: 18px;
   position: relative;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .admin-modal {
   width: min(620px, 100%);
   padding-top: 28px;
+}
+
+.admin-modal-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-modal-content h1,
+.admin-modal-content h2 {
+  flex: 0 0 auto;
+}
+
+.admin-panel--modal {
+  margin-top: 12px;
+}
+
+.admin-panel--modal .admin-form {
+  margin-bottom: 0;
+}
+
+.admin-panel--modal .state-message {
+  margin-top: 8px;
 }
 
 .activity-modal {
@@ -777,9 +808,9 @@ body {
 }
 
 .dish-modal-close {
-  position: absolute;
+  position: sticky;
   top: 10px;
-  right: 10px;
+  align-self: flex-end;
   width: 32px;
   height: 32px;
   border-radius: 999px;
