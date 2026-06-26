@@ -42,6 +42,7 @@ body {
   max-width: 820px;
   margin: 0 auto;
   padding: 8px 14px 24px;
+  text-transform: lowercase;
 }
 
 .top-menu {
@@ -75,8 +76,10 @@ body {
 }
 
 .menu-actions--strip {
+  position: relative;
+  min-height: 40px;
   margin-bottom: 0;
-  justify-content: flex-start;
+  justify-content: center;
 }
 
 .top-menu--strip .menu-link,
@@ -93,6 +96,7 @@ body {
 
 .menu-actions--categories {
   margin-bottom: 12px;
+  justify-content: center;
 }
 
 .menu-group {
@@ -105,10 +109,11 @@ body {
 
 .menu-group-title {
   margin: 0 0 8px;
+  text-align: center;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: lowercase;
   color: var(--muted);
 }
 
@@ -145,7 +150,10 @@ body {
 }
 
 .menu-link--profile {
-  margin-left: auto;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 40px;
   height: 40px;
   padding: 0;
@@ -161,6 +169,10 @@ body {
 .menu-link--profile:hover {
   background: transparent;
   border-color: transparent;
+}
+
+.menu-link--profile:active {
+  transform: translateY(-50%) scale(0.97);
 }
 
 .menu-avatar {
@@ -181,26 +193,33 @@ body {
   border-color: var(--chip-active);
 }
 
-.category-page h1 {
-  margin: 14px 2px 14px;
-  font-size: 30px;
-  line-height: 1.1;
-  font-weight: 800;
-}
-
-.category-page--empty {
-  min-height: calc(100svh - 230px);
-  display: grid;
-  place-items: center;
+.category-title {
+  margin: 14px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
   text-align: center;
-  padding: 12px;
-}
-
-.empty-category-state h2 {
-  margin: 0;
   font-size: 30px;
   line-height: 1.1;
   font-weight: 800;
+}
+
+.category-title::before,
+.category-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.22));
+}
+
+.category-title::after {
+  background: linear-gradient(to left, transparent, rgba(0, 0, 0, 0.22));
+}
+
+.empty-category-state {
+  text-align: center;
+  padding: 16px 12px;
 }
 
 .empty-category-state p {
@@ -440,7 +459,7 @@ body {
   }
 
   .menu-actions--categories {
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .dish-grid {
@@ -448,12 +467,12 @@ body {
     gap: 14px;
   }
 
-  .category-page h1 {
+  .category-title {
     font-size: 36px;
     margin-top: 18px;
   }
 
-  .empty-category-state h2 {
-    font-size: 36px;
+  .empty-category-state .category-title {
+    margin-top: 0;
   }
 }

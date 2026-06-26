@@ -45,7 +45,7 @@ export default function TopMenu({
               Страви
             </NavLink>
             <button type="button" className="menu-link menu-link--button" onClick={onLogout}>
-              Вийти ({currentUser.role === 'ADMIN' ? 'admin' : 'user'})
+              вийти
             </button>
             <NavLink to="/profile" className={profileLinkClass}>
               <img

@@ -48,27 +48,25 @@ export default function CategoryPage({
   const isEmptyCategory = filteredDishes.length === 0
 
   return (
-    <main className={isEmptyCategory ? 'category-page category-page--empty' : 'category-page'}>
+    <main className="category-page">
+      <h1 className="category-title">{category?.name || 'Меню'}</h1>
+
       {isEmptyCategory ? (
         <section className="empty-category-state" aria-label={`Страви: ${category?.name || 'Меню'}`}>
-          <h2>{category?.name || 'Меню'}</h2>
           <p>Тут поки порожньо. Додайте перші страви у цю категорію.</p>
         </section>
       ) : (
-        <>
-          <h1>{category?.name || 'Меню'}</h1>
-          <section className="dish-grid" aria-label={`Страви: ${category?.name || 'Меню'}`}>
-            {filteredDishes.map((dish) => (
-              <DishCard
-                key={`${selectedCategoryId}-${dish.id}`}
-                id={dish.id}
-                title={dish.title}
-                description={dish.description}
-                isAdmin={isAdmin}
-              />
-            ))}
-          </section>
-        </>
+        <section className="dish-grid" aria-label={`Страви: ${category?.name || 'Меню'}`}>
+          {filteredDishes.map((dish) => (
+            <DishCard
+              key={`${selectedCategoryId}-${dish.id}`}
+              id={dish.id}
+              title={dish.title}
+              description={dish.description}
+              isAdmin={isAdmin}
+            />
+          ))}
+        </section>
       )}
     </main>
   )
