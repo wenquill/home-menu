@@ -729,16 +729,19 @@ body {
 .dashboard-link-button {
   width: 100%;
   border: 1px solid var(--btn-border);
-  background: var(--btn-bg);
-  color: var(--btn-text);
+  background: transparent;
+  color: var(--btn-border);
   border-radius: 12px;
   padding: 10px 12px;
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, opacity 150ms ease;
 }
 
 .dashboard-link-button:hover {
+  background: var(--btn-bg);
+  color: var(--btn-text);
   opacity: 0.95;
 }
 
