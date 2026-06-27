@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 function formatDate(dateValue) {
   const date = new Date(dateValue)
@@ -14,7 +14,12 @@ function formatDate(dateValue) {
   }).format(date)
 }
 
-export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedRecipe }) {
+export default function SavedRecipesPage({
+  onLoadSavedRecipes,
+  onCreateSavedRecipe,
+  onUpdateSavedRecipe,
+  onDeleteSavedRecipe,
+}) {
   const cornerOffsets = [
     { x: '10%', y: '10%' },
     { x: '90%', y: '10%' },
@@ -35,6 +40,10 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [selectedRecipe, setSelectedRecipe] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [recipeToDelete, setRecipeToDelete] = useState(null)
+  const [searchText, setSearchText] = useState('')
+  const [sortBy, setSortBy] = useState('date-desc')
 
   const loadRecipes = async () => {
     setIsLoading(true)
@@ -88,6 +97,20 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
     setFormError('')
   }
 
+  const closeEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedRecipe(null)
+    setTitle('')
+    setLink('')
+    setNotes('')
+    setFormError('')
+  }
+
+  const closeDeleteModal = () => {
+    setRecipeToDelete(null)
+    setFormError('')
+  }
+
   const submitRecipe = async (event) => {
     event.preventDefault()
     setFormError('')
@@ -115,6 +138,105 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
     }
   }
 
+  const openEditModal = (recipe) => {
+    setSelectedRecipe(recipe)
+    setTitle(recipe.title || '')
+    setLink(recipe.link || '')
+    setNotes(recipe.notes || '')
+    setFormError('')
+    setIsEditModalOpen(true)
+  }
+
+  const submitRecipeEdit = async (event) => {
+    event.preventDefault()
+    setFormError('')
+
+    if (!selectedRecipe) {
+      return
+    }
+
+    if (!title.trim()) {
+      setFormError('Вкажіть назву рецепта')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const updated = await onUpdateSavedRecipe?.({
+        id: selectedRecipe.id,
+        title: title.trim(),
+        link: link.trim(),
+        notes: notes.trim(),
+      })
+
+      setRecipes((prev) => prev.map((recipe) => (recipe.id === updated.id ? updated : recipe)))
+      closeEditModal()
+    } catch (error) {
+      setFormError(error.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const deleteRecipe = async () => {
+    if (!recipeToDelete) {
+      return
+    }
+
+    setFormError('')
+    setIsSubmitting(true)
+
+    try {
+      await onDeleteSavedRecipe?.(recipeToDelete.id)
+      setRecipes((prev) => prev.filter((recipe) => recipe.id !== recipeToDelete.id))
+      if (selectedRecipe?.id === recipeToDelete.id) {
+        setSelectedRecipe(null)
+      }
+      closeDeleteModal()
+    } catch (error) {
+      setFormError(error.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const normalizedSearch = searchText.trim().toLowerCase()
+
+  const visibleRecipes = useMemo(() => {
+    const filtered = normalizedSearch
+      ? recipes.filter((recipe) => {
+          const titleValue = String(recipe.title || '').toLowerCase()
+          const notesValue = String(recipe.notes || '').toLowerCase()
+          const linkValue = String(recipe.link || '').toLowerCase()
+
+          return (
+            titleValue.includes(normalizedSearch) ||
+            notesValue.includes(normalizedSearch) ||
+            linkValue.includes(normalizedSearch)
+          )
+        })
+      : recipes
+
+    const list = [...filtered]
+
+    switch (sortBy) {
+      case 'date-asc':
+        return list.sort((a, b) => a.id - b.id)
+      case 'title-asc':
+        return list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'uk'))
+      case 'title-desc':
+        return list.sort((a, b) => String(b.title || '').localeCompare(String(a.title || ''), 'uk'))
+      case 'link-first':
+        return list.sort((a, b) => Number(Boolean(b.link)) - Number(Boolean(a.link)))
+      case 'link-last':
+        return list.sort((a, b) => Number(Boolean(a.link)) - Number(Boolean(b.link)))
+      case 'date-desc':
+      default:
+        return list.sort((a, b) => b.id - a.id)
+    }
+  }, [recipes, normalizedSearch, sortBy])
+
   return (
     <main className="category-page">
       <div className="saved-recipes-header">
@@ -137,18 +259,35 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
         </div>
       </div>
 
+      <div className="dish-search" role="search">
+        <input
+          type="search"
+          placeholder="пошук: назва, посилання, нотатки"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+        />
+        <select aria-label="Сортування рецептів" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+          <option value="date-desc">спочатку нові</option>
+          <option value="date-asc">спочатку старі</option>
+          <option value="title-asc">назва: а-я</option>
+          <option value="title-desc">назва: я-а</option>
+          <option value="link-first">спочатку з посиланням</option>
+          <option value="link-last">спочатку без посилання</option>
+        </select>
+      </div>
+
       {pageError ? <p className="state-message state-message--error">{pageError}</p> : null}
       {isLoading ? <p className="state-message">завантаження рецептів...</p> : null}
 
-      {!isLoading && !pageError && recipes.length === 0 ? (
+      {!isLoading && !pageError && visibleRecipes.length === 0 ? (
         <section className="empty-category-state">
-          <p>У вас ще немає збережених рецептів.</p>
+          <p>{normalizedSearch ? 'За запитом нічого не знайдено.' : 'У вас ще немає збережених рецептів.'}</p>
         </section>
       ) : null}
 
-      {!isLoading && recipes.length > 0 ? (
+      {!isLoading && visibleRecipes.length > 0 ? (
         <section className="saved-recipes-grid" aria-label="Список збережених рецептів">
-          {recipes.map((recipe) => (
+          {visibleRecipes.map((recipe) => (
             (() => {
               const corner = cornerOffsets[recipe.id % cornerOffsets.length]
               const spotSize = spotSizes[(recipe.id * 7) % spotSizes.length]
@@ -172,7 +311,44 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
                     }
                   }}
                 >
-                  <h3>{recipe.title}</h3>
+                  <div className="dish-card-header">
+                    <h3>{recipe.title}</h3>
+                    <div className="dish-card-actions">
+                      <button
+                        type="button"
+                        className="dish-icon-button"
+                        aria-label="Редагувати"
+                        title="Редагувати"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          openEditModal(recipe)
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        className="dish-icon-button"
+                        aria-label="Видалити"
+                        title="Видалити"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setRecipeToDelete(recipe)
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 10v7" />
+                          <path d="M14 10v7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                   {recipe.link ? <p className="saved-recipe-link-preview">{recipe.link}</p> : null}
                   {recipe.notes ? <p>{recipe.notes}</p> : <p className="saved-recipe-muted">без нотаток</p>}
                   <time>{formatDate(recipe.createdAt)}</time>
@@ -241,7 +417,7 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
         </div>
       ) : null}
 
-      {selectedRecipe ? (
+      {selectedRecipe && !isEditModalOpen && !recipeToDelete ? (
         <div className="dish-modal-overlay" role="presentation" onClick={() => setSelectedRecipe(null)}>
           <section
             className="dish-modal"
@@ -281,6 +457,99 @@ export default function SavedRecipesPage({ onLoadSavedRecipes, onCreateSavedReci
             ) : (
               <p className="saved-recipe-muted">нотатки не додано</p>
             )}
+
+          </section>
+        </div>
+      ) : null}
+
+      {isEditModalOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeEditModal}>
+          <section
+            className="dish-modal dish-modal--edit"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Редагувати рецепт"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dish-modal-header">
+              <h2>редагувати рецепт</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeEditModal}>
+                ×
+              </button>
+            </div>
+
+            <form className="dish-modal-form" onSubmit={submitRecipeEdit}>
+              <label htmlFor="edit-saved-recipe-title">назва</label>
+              <input
+                id="edit-saved-recipe-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+              />
+
+              <label htmlFor="edit-saved-recipe-link">посилання</label>
+              <input
+                id="edit-saved-recipe-link"
+                type="url"
+                value={link}
+                onChange={(event) => setLink(event.target.value)}
+                placeholder="https://..."
+              />
+
+              <label htmlFor="edit-saved-recipe-notes">нотатки</label>
+              <textarea
+                id="edit-saved-recipe-notes"
+                rows={5}
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="додаткові замітки"
+              />
+
+              {formError ? <p className="state-message state-message--error">{formError}</p> : null}
+
+              <div className="dish-modal-actions">
+                <button type="button" className="dish-modal-secondary" onClick={closeEditModal}>
+                  скасувати
+                </button>
+                <button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'зберігаю...' : 'зберегти зміни'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
+
+      {recipeToDelete ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeDeleteModal}>
+          <section
+            className="dish-modal dish-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Видалити рецепт ${recipeToDelete.title}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dish-modal-header">
+              <h2>видалити рецепт?</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeDeleteModal}>
+                ×
+              </button>
+            </div>
+
+            <p className="dish-modal-warning">
+              Рецепт <strong>{recipeToDelete.title}</strong> буде видалено назавжди.
+            </p>
+
+            {formError ? <p className="state-message state-message--error">{formError}</p> : null}
+
+            <div className="dish-modal-actions dish-modal-actions--confirm">
+              <button type="button" className="dish-modal-secondary" onClick={closeDeleteModal}>
+                скасувати
+              </button>
+              <button type="button" className="dish-modal-danger" onClick={() => void deleteRecipe()} disabled={isSubmitting}>
+                {isSubmitting ? 'видаляю...' : 'видалити'}
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

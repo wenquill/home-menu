@@ -425,6 +425,27 @@ function App() {
     )
   }
 
+  const handleUpdateSavedRecipe = async ({ id, ...payload }) => {
+    return apiRequest(
+      `/api/saved-recipes/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+      authToken,
+    )
+  }
+
+  const handleDeleteSavedRecipe = async (id) => {
+    return apiRequest(
+      `/api/saved-recipes/${id}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+  }
+
   const refreshProjectScopedData = async () => {
     const [menu, favorites, projects] = await Promise.all([
       apiRequest('/api/menu', {}, authToken),
@@ -675,6 +696,8 @@ function App() {
             <SavedRecipesPage
               onLoadSavedRecipes={handleLoadSavedRecipes}
               onCreateSavedRecipe={handleCreateSavedRecipe}
+              onUpdateSavedRecipe={handleUpdateSavedRecipe}
+              onDeleteSavedRecipe={handleDeleteSavedRecipe}
             />,
           )}
         />

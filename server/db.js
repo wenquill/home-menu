@@ -1515,6 +1515,51 @@ export function createSavedRecipeByUser({ userId, title, link = '', notes = '' }
     .get(Number(result.lastInsertRowid))
 }
 
+export function updateSavedRecipeByUser({ id, userId, title, link = '', notes = '' }) {
+  const normalizedTitle = String(title || '').trim()
+  const normalizedLink = String(link || '').trim()
+  const normalizedNotes = String(notes || '').trim()
+
+  if (!normalizedTitle) {
+    throw new Error('Назва рецепта обовʼязкова')
+  }
+
+  const result = db
+    .prepare(
+      `UPDATE saved_recipes
+       SET title = ?, link = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+    )
+    .run(normalizedTitle, normalizedLink, normalizedNotes, id, userId)
+
+  if (result.changes < 1) {
+    return null
+  }
+
+  return db
+    .prepare(
+      `SELECT
+        id,
+        user_id AS userId,
+        title,
+        link,
+        notes,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM saved_recipes
+       WHERE id = ? AND user_id = ?`,
+    )
+    .get(id, userId)
+}
+
+export function deleteSavedRecipeByUser({ id, userId }) {
+  const result = db
+    .prepare('DELETE FROM saved_recipes WHERE id = ? AND user_id = ?')
+    .run(id, userId)
+
+  return result.changes > 0
+}
+
 export function getFavoriteDishIdsForUser(userId) {
   const rows = db
     .prepare(

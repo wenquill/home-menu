@@ -570,6 +570,7 @@ body {
 }
 
 .saved-recipes-header {
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;

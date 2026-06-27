@@ -8,6 +8,7 @@ import {
   addShoppingItemInProject,
   addShoppingItemsInProject,
   createSavedRecipeByUser,
+    deleteSavedRecipeByUser,
   addProjectMembership,
   clearShoppingListInProject,
   countProjectMembers,
@@ -37,6 +38,7 @@ import {
   getProjectsForUser,
   getShoppingListItemsByProject,
   getSavedRecipesByUser,
+    updateSavedRecipeByUser,
   getProjectMembers,
   getRecentActivityLogsForUser,
   getUnreadActivityLogsCountForUser,
@@ -622,10 +624,77 @@ app.post('/api/saved-recipes', authRequired, (req, res) => {
       notes,
     })
 
+    const actorName = req.user.displayName || req.user.email
+
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      action: 'SAVED_RECIPE_CREATED',
+      message: `${actorName} зберіг(ла) новий рецепт "${recipe.title}"`,
+      details: {
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        hasLink: Boolean(recipe.link),
+      },
+    })
+
     return res.status(201).json(recipe)
   } catch (error) {
     return res.status(400).json({ message: error.message || 'Не вдалося зберегти рецепт' })
   }
+})
+
+app.put('/api/saved-recipes/:id', authRequired, (req, res) => {
+  const recipeId = Number(req.params.id)
+  const title = String(req.body.title || '').trim()
+  const link = String(req.body.link || '').trim()
+  const notes = String(req.body.notes || '').trim()
+
+  if (!Number.isInteger(recipeId) || recipeId < 1) {
+    return res.status(400).json({ message: 'Некоректний id рецепта' })
+  }
+
+  if (!title) {
+    return res.status(400).json({ message: 'Назва рецепта обовʼязкова' })
+  }
+
+  if (link && !/^https?:\/\//i.test(link)) {
+    return res.status(400).json({ message: 'Посилання має починатися з http:// або https://' })
+  }
+
+  try {
+    const recipe = updateSavedRecipeByUser({
+      id: recipeId,
+      userId: req.user.id,
+      title,
+      link,
+      notes,
+    })
+
+    if (!recipe) {
+      return res.status(404).json({ message: 'Рецепт не знайдено' })
+    }
+
+    return res.json(recipe)
+  } catch (error) {
+    return res.status(400).json({ message: error.message || 'Не вдалося оновити рецепт' })
+  }
+})
+
+app.delete('/api/saved-recipes/:id', authRequired, (req, res) => {
+  const recipeId = Number(req.params.id)
+
+  if (!Number.isInteger(recipeId) || recipeId < 1) {
+    return res.status(400).json({ message: 'Некоректний id рецепта' })
+  }
+
+  const deleted = deleteSavedRecipeByUser({ id: recipeId, userId: req.user.id })
+
+  if (!deleted) {
+    return res.status(404).json({ message: 'Рецепт не знайдено' })
+  }
+
+  return res.status(204).send()
 })
 
 app.post('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
