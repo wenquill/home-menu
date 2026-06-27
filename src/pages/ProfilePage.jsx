@@ -255,50 +255,6 @@ export default function ProfilePage({
         {formError ? <p className="state-message state-message--error">{formError}</p> : null}
         {formMessage ? <p className="state-message">{formMessage}</p> : null}
       </section>
-
-      {canManageProjects ? (
-        <section className="admin-panel" aria-label="Керування проєктами">
-          <h2>проєкти</h2>
-
-          <form className="admin-form" onSubmit={submitProjectSwitch}>
-            <label htmlFor="profile-project-select">Поточний проєкт</label>
-            <select
-              id="profile-project-select"
-              value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
-            >
-              <option value="">Оберіть проєкт</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-
-            <button type="submit" disabled={isProjectSubmitting || !projects.length}>
-              {isProjectSubmitting ? 'зберігаю...' : 'змінити поточний проєкт'}
-            </button>
-          </form>
-
-          <form className="admin-form" onSubmit={submitCreateProject}>
-            <label htmlFor="profile-new-project">створити новий проєкт</label>
-            <input
-              id="profile-new-project"
-              type="text"
-              value={newProjectName}
-              onChange={(event) => setNewProjectName(event.target.value)}
-              maxLength={80}
-              placeholder="назва проєкту"
-            />
-            <button type="submit" disabled={isProjectSubmitting}>
-              {isProjectSubmitting ? 'створюю...' : 'створити проєкт'}
-            </button>
-          </form>
-
-          {projectError ? <p className="state-message state-message--error">{projectError}</p> : null}
-          {projectMessage ? <p className="state-message">{projectMessage}</p> : null}
-        </section>
-      ) : null}
     </main>
   )
 }
