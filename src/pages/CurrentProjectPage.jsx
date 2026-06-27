@@ -206,7 +206,6 @@ export default function CurrentProjectPage({
 
                         {canEditPermissions ? (
                           <label className="project-members-role-control">
-                            <span>Права</span>
                             <select
                               value={currentPermissionsRole}
                               onChange={(event) => {

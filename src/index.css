@@ -807,6 +807,37 @@ body {
   background: #fff;
 }
 
+@media (max-width: 640px) {
+  .project-members-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .project-members-item-main {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-members-meta {
+    overflow: visible;
+    text-overflow: initial;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .project-members-role-control {
+    min-width: 0;
+    flex: 1 1 160px;
+  }
+
+  .project-members-remove {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
+}
+
 .dish-card--interactive {
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 140ms ease;
@@ -1070,19 +1101,19 @@ body {
 .activity-day-toggle {
   width: 100%;
   border: 0;
-  background: #fff9db;
+  background: var(--accent-soft-bg);
   padding: 10px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font: inherit;
   font-weight: 700;
-  color: #222;
+  color: var(--text);
   cursor: pointer;
 }
 
 .activity-day-toggle-meta {
-  color: #6a6a6a;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1104,13 +1135,13 @@ body {
 
 .activity-log-item p {
   margin: 0;
-  color: #212121;
+  color: var(--text);
   font-size: 14px;
   line-height: 1.45;
 }
 
 .activity-log-item time {
-  color: #777;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -1129,7 +1160,7 @@ body {
 }
 
 .activity-log-status--read {
-  color: #4b5563;
+  color: var(--muted);
 }
 
 .activity-log-status--unread {
