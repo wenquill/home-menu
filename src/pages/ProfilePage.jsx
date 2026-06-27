@@ -107,7 +107,7 @@ export default function ProfilePage({
     setProjectMessage('')
 
     if (!selectedProjectId) {
-      setProjectError('Оберіть поточний проєкт')
+      setProjectError('оберіть поточний проєкт')
       return
     }
 
@@ -115,7 +115,7 @@ export default function ProfilePage({
 
     try {
       await onSwitchProject?.(Number(selectedProjectId))
-      setProjectMessage('Поточний проєкт змінено')
+      setProjectMessage('поточний проєкт змінено')
     } catch (error) {
       setProjectError(error.message)
     } finally {
@@ -129,7 +129,7 @@ export default function ProfilePage({
     setProjectMessage('')
 
     if (!newProjectName.trim()) {
-      setProjectError('Назва проєкту обовʼязкова')
+      setProjectError('назва проєкту обовʼязкова')
       return
     }
 
@@ -141,7 +141,7 @@ export default function ProfilePage({
       if (project?.id) {
         setSelectedProjectId(String(project.id))
       }
-      setProjectMessage('Новий проєкт створено')
+      setProjectMessage('новий проєкт створено')
     } catch (error) {
       setProjectError(error.message)
     } finally {
@@ -205,7 +205,7 @@ export default function ProfilePage({
             type="password"
             value={currentPassword}
             onChange={(event) => setCurrentPassword(event.target.value)}
-            placeholder="Введіть поточний пароль"
+            placeholder="введіть поточний пароль"
           />
 
           <label htmlFor="profile-new-password">Новий пароль</label>
@@ -214,7 +214,7 @@ export default function ProfilePage({
             type="password"
             value={newPassword}
             onChange={(event) => setNewPassword(event.target.value)}
-            placeholder="Мінімум 6 символів"
+            placeholder="мінімум 6 символів"
           />
 
           <label htmlFor="profile-confirm-password">Підтвердити новий пароль</label>
@@ -223,7 +223,7 @@ export default function ProfilePage({
             type="password"
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
-            placeholder="Повторіть новий пароль"
+            placeholder="повторіть новий пароль"
           />
 
           <label>Тема акценту</label>
@@ -250,7 +250,7 @@ export default function ProfilePage({
           </div>
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Зберігаю...' : 'Зберегти зміни'}
+            {isSubmitting ? 'зберігаю...' : 'зберегти зміни'}
           </button>
         </form>
 
@@ -278,22 +278,22 @@ export default function ProfilePage({
             </select>
 
             <button type="submit" disabled={isProjectSubmitting || !projects.length}>
-              {isProjectSubmitting ? 'Зберігаю...' : 'Змінити поточний проєкт'}
+              {isProjectSubmitting ? 'зберігаю...' : 'змінити поточний проєкт'}
             </button>
           </form>
 
           <form className="admin-form" onSubmit={submitCreateProject}>
-            <label htmlFor="profile-new-project">Створити новий проєкт</label>
+            <label htmlFor="profile-new-project">створити новий проєкт</label>
             <input
               id="profile-new-project"
               type="text"
               value={newProjectName}
               onChange={(event) => setNewProjectName(event.target.value)}
               maxLength={80}
-              placeholder="Назва проєкту"
+              placeholder="назва проєкту"
             />
             <button type="submit" disabled={isProjectSubmitting}>
-              {isProjectSubmitting ? 'Створюю...' : 'Створити проєкт'}
+              {isProjectSubmitting ? 'створюю...' : 'створити проєкт'}
             </button>
           </form>
 

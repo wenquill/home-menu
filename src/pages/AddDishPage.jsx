@@ -96,7 +96,7 @@ export default function AddDishPage({
             id="dish-title"
             value={dishTitle}
             onChange={(event) => setDishTitle(event.target.value)}
-            placeholder="Наприклад, Сирники з ягодами"
+            placeholder="наприклад, сирники з ягодами"
             required
           />
 
@@ -105,7 +105,7 @@ export default function AddDishPage({
             id="dish-description"
             value={dishDescription}
             onChange={(event) => setDishDescription(event.target.value)}
-            placeholder="Короткий опис страви"
+            placeholder="короткий опис страви"
             rows={4}
           />
 

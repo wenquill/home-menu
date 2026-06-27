@@ -47,7 +47,7 @@ export default function AddCategoryPage({ onAddCategory, embedded = false, onClo
             id="category-name"
             value={categoryName}
             onChange={(event) => setCategoryName(event.target.value)}
-            placeholder="Наприклад, Супи"
+            placeholder="наприклад, Супи"
             required
           />
 

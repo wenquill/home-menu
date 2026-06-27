@@ -163,7 +163,7 @@ export default function CurrentProjectPage({
                     placeholder="email користувача"
                   />
                   <button type="submit" disabled={isInviting}>
-                    {isInviting ? 'Надсилаю...' : 'Запросити'}
+                    {isInviting ? 'надсилаю...' : 'запросити'}
                   </button>
                 </form>
 
@@ -213,8 +213,8 @@ export default function CurrentProjectPage({
                               }}
                               disabled={updatingRoleMemberId === member.id}
                             >
-                              <option value="MEMBER">Учасник</option>
-                              <option value="EDITOR">Редактор</option>
+                              <option value="MEMBER">учасник</option>
+                              <option value="EDITOR">редактор</option>
                             </select>
                           </label>
                         ) : null}
@@ -228,7 +228,7 @@ export default function CurrentProjectPage({
                             }}
                             disabled={removingMemberId === member.id}
                           >
-                            {removingMemberId === member.id ? 'Видаляю...' : 'Видалити'}
+                            {removingMemberId === member.id ? 'видаляю...' : 'видалити'}
                           </button>
                         ) : null}
                       </li>

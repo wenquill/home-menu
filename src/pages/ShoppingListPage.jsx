@@ -169,10 +169,10 @@ export default function ShoppingListPage({
               value={newItemText}
               onChange={(event) => setNewItemText(event.target.value)}
               maxLength={120}
-              placeholder="Наприклад: молоко"
+              placeholder="наприклад: молоко"
             />
             <button type="submit" disabled={isAdding}>
-              {isAdding ? 'Додаю...' : 'Додати'}
+              {isAdding ? 'додаю...' : 'додати'}
             </button>
           </div>
         </form>
@@ -217,7 +217,7 @@ export default function ShoppingListPage({
           }}
           disabled={isClearing || visibleItems.length === 0}
         >
-          {isClearing ? 'Очищую...' : 'Очистити список'}
+          {isClearing ? 'очищую...' : 'очистити список'}
         </button>
       </div>
 
