@@ -40,6 +40,7 @@ import {
   getProjectsForUser,
   getShoppingListItemsByProject,
   getSavedRecipesByUser,
+  setSavedRecipeTriedByUser,
   updateSavedRecipeByUser,
   getProjectMembers,
   getRecentActivityLogsForUserInProject,
@@ -745,10 +746,12 @@ app.post('/api/saved-recipes', authRequired, (req, res) => {
     })
 
     const actorName = req.user.displayName || req.user.email
+    const activityProjectId = resolveCurrentProjectId(req.user)
 
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
+      projectId: activityProjectId || undefined,
       action: 'SAVED_RECIPE_CREATED',
       message: `${actorName} зберіг(ла) новий рецепт "${recipe.title}"`,
       details: {
@@ -762,6 +765,47 @@ app.post('/api/saved-recipes', authRequired, (req, res) => {
   } catch (error) {
     return res.status(400).json({ message: error.message || 'Не вдалося зберегти рецепт' })
   }
+})
+
+app.patch('/api/saved-recipes/:id/tried', authRequired, (req, res) => {
+  const recipeId = Number(req.params.id)
+  const isTried = Boolean(req.body.isTried)
+
+  if (!Number.isInteger(recipeId) || recipeId < 1) {
+    return res.status(400).json({ message: 'Некоректний id рецепта' })
+  }
+
+  const recipe = setSavedRecipeTriedByUser({
+    id: recipeId,
+    userId: req.user.id,
+    isTried,
+  })
+
+  if (!recipe) {
+    return res.status(404).json({ message: 'Рецепт не знайдено' })
+  }
+
+  const actorName = req.user.displayName || req.user.email
+  const activityProjectId = resolveCurrentProjectId(req.user)
+
+  if (activityProjectId) {
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      projectId: activityProjectId,
+      action: 'SAVED_RECIPE_TRY_STATUS_UPDATED',
+      message: isTried
+        ? `${actorName} позначив(ла) рецепт "${recipe.title}" як спробований`
+        : `${actorName} зняв(ла) позначку спробованого з рецепта "${recipe.title}"`,
+      details: {
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        isTried: Boolean(recipe.isTried),
+      },
+    })
+  }
+
+  return res.json(recipe)
 })
 
 app.put('/api/saved-recipes/:id', authRequired, (req, res) => {

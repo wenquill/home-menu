@@ -468,6 +468,17 @@ function App() {
     )
   }
 
+  const handleToggleSavedRecipeTried = async (id, isTried) => {
+    return apiRequest(
+      `/api/saved-recipes/${id}/tried`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ isTried }),
+      },
+      authToken,
+    )
+  }
+
   const refreshProjectScopedData = async () => {
     const [menu, favorites, projects] = await Promise.all([
       apiRequest('/api/menu', {}, authToken),
@@ -753,6 +764,7 @@ function App() {
               onCreateSavedRecipe={handleCreateSavedRecipe}
               onUpdateSavedRecipe={handleUpdateSavedRecipe}
               onDeleteSavedRecipe={handleDeleteSavedRecipe}
+              onToggleSavedRecipeTried={handleToggleSavedRecipeTried}
             />,
           )}
         />

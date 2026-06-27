@@ -616,6 +616,11 @@ body {
   cursor: pointer;
 }
 
+.saved-recipe-card--tried {
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px rgba(var(--accent-card-glow-rgb), 0.5) inset;
+}
+
 .saved-recipe-card h3 {
   margin: 0;
   font-size: 16px;
@@ -639,6 +644,25 @@ body {
   margin-top: 8px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.saved-recipe-tried-note {
+  display: inline-flex;
+  align-items: center;
+  padding-left: 8px;
+  color: var(--accent-check-mark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.saved-recipe-status-button {
+  color: var(--muted);
+}
+
+.saved-recipe-status-button--active {
+  color: var(--accent-check-mark);
+  border-color: var(--accent-border);
+  background: var(--accent-paper);
 }
 
 .saved-recipe-muted {

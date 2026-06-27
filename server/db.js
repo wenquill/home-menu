@@ -616,6 +616,8 @@ export function initializeDatabase() {
       title TEXT NOT NULL,
       link TEXT NOT NULL DEFAULT '',
       notes TEXT NOT NULL DEFAULT '',
+      is_tried INTEGER NOT NULL DEFAULT 0,
+      tried_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -870,6 +872,8 @@ export function initializeDatabase() {
 
   const savedRecipesColumns = db.prepare("PRAGMA table_info('saved_recipes')").all()
   const hasSavedRecipesTable = savedRecipesColumns.length > 0
+  const hasSavedRecipeTriedColumn = savedRecipesColumns.some((column) => column.name === 'is_tried')
+  const hasSavedRecipeTriedAtColumn = savedRecipesColumns.some((column) => column.name === 'tried_at')
 
   if (!hasSavedRecipesTable) {
     db.exec(`
@@ -879,12 +883,22 @@ export function initializeDatabase() {
         title TEXT NOT NULL,
         link TEXT NOT NULL DEFAULT '',
         notes TEXT NOT NULL DEFAULT '',
+        is_tried INTEGER NOT NULL DEFAULT 0,
+        tried_at TEXT,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_saved_recipes_user ON saved_recipes(user_id);
     `)
+  }
+
+  if (hasSavedRecipesTable && !hasSavedRecipeTriedColumn) {
+    db.exec('ALTER TABLE saved_recipes ADD COLUMN is_tried INTEGER NOT NULL DEFAULT 0')
+  }
+
+  if (hasSavedRecipesTable && !hasSavedRecipeTriedAtColumn) {
+    db.exec('ALTER TABLE saved_recipes ADD COLUMN tried_at TEXT')
   }
 
   const adminCount = db
@@ -1560,6 +1574,8 @@ export function getSavedRecipesByUser(userId) {
         title,
         link,
         notes,
+        is_tried AS isTried,
+        tried_at AS triedAt,
         created_at AS createdAt,
         updated_at AS updatedAt
        FROM saved_recipes
@@ -1580,8 +1596,8 @@ export function createSavedRecipeByUser({ userId, title, link = '', notes = '' }
 
   const result = db
     .prepare(
-      `INSERT INTO saved_recipes (user_id, title, link, notes)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO saved_recipes (user_id, title, link, notes, is_tried, tried_at)
+       VALUES (?, ?, ?, ?, 0, NULL)`,
     )
     .run(userId, normalizedTitle, normalizedLink, normalizedNotes)
 
@@ -1593,6 +1609,8 @@ export function createSavedRecipeByUser({ userId, title, link = '', notes = '' }
         title,
         link,
         notes,
+        is_tried AS isTried,
+        tried_at AS triedAt,
         created_at AS createdAt,
         updated_at AS updatedAt
        FROM saved_recipes
@@ -1630,6 +1648,43 @@ export function updateSavedRecipeByUser({ id, userId, title, link = '', notes = 
         title,
         link,
         notes,
+        is_tried AS isTried,
+        tried_at AS triedAt,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM saved_recipes
+       WHERE id = ? AND user_id = ?`,
+    )
+    .get(id, userId)
+}
+
+export function setSavedRecipeTriedByUser({ id, userId, isTried }) {
+  const normalizedTried = Boolean(isTried)
+
+  const result = db
+    .prepare(
+      `UPDATE saved_recipes
+       SET is_tried = ?,
+           tried_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND user_id = ?`,
+    )
+    .run(normalizedTried ? 1 : 0, normalizedTried ? 1 : 0, id, userId)
+
+  if (result.changes < 1) {
+    return null
+  }
+
+  return db
+    .prepare(
+      `SELECT
+        id,
+        user_id AS userId,
+        title,
+        link,
+        notes,
+        is_tried AS isTried,
+        tried_at AS triedAt,
         created_at AS createdAt,
         updated_at AS updatedAt
        FROM saved_recipes

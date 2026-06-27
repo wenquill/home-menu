@@ -19,6 +19,7 @@ export default function SavedRecipesPage({
   onCreateSavedRecipe,
   onUpdateSavedRecipe,
   onDeleteSavedRecipe,
+  onToggleSavedRecipeTried,
 }) {
   const cornerOffsets = [
     { x: '10%', y: '10%' },
@@ -42,6 +43,7 @@ export default function SavedRecipesPage({
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [recipeToDelete, setRecipeToDelete] = useState(null)
+  const [activeTriedRecipeId, setActiveTriedRecipeId] = useState(null)
   const [searchText, setSearchText] = useState('')
   const [sortBy, setSortBy] = useState('date-desc')
 
@@ -201,6 +203,25 @@ export default function SavedRecipesPage({
     }
   }
 
+  const toggleRecipeTried = async (recipe) => {
+    if (!recipe || !onToggleSavedRecipeTried) {
+      return
+    }
+
+    setFormError('')
+    setActiveTriedRecipeId(recipe.id)
+
+    try {
+      const updated = await onToggleSavedRecipeTried(recipe.id, !Boolean(recipe.isTried))
+      setRecipes((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+      setSelectedRecipe((prev) => (prev && prev.id === updated.id ? updated : prev))
+    } catch (error) {
+      setFormError(error.message)
+    } finally {
+      setActiveTriedRecipeId(null)
+    }
+  }
+
   const normalizedSearch = searchText.trim().toLowerCase()
 
   const visibleRecipes = useMemo(() => {
@@ -295,7 +316,7 @@ export default function SavedRecipesPage({
               return (
                 <article
                   key={recipe.id}
-                  className="saved-recipe-card"
+                  className={Boolean(recipe.isTried) ? 'saved-recipe-card saved-recipe-card--tried' : 'saved-recipe-card'}
                   style={{
                     '--dish-spot-x': corner.x,
                     '--dish-spot-y': corner.y,
@@ -314,6 +335,30 @@ export default function SavedRecipesPage({
                   <div className="dish-card-header">
                     <h3>{recipe.title}</h3>
                     <div className="dish-card-actions">
+                      <button
+                        type="button"
+                        className={Boolean(recipe.isTried)
+                          ? 'dish-icon-button saved-recipe-status-button saved-recipe-status-button--active'
+                          : 'dish-icon-button saved-recipe-status-button'}
+                        aria-label={Boolean(recipe.isTried) ? 'Позначити як не виконано' : 'Позначити як виконано'}
+                        title={Boolean(recipe.isTried) ? 'Спробовано' : 'Не спробовано'}
+                        disabled={activeTriedRecipeId === recipe.id}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          void toggleRecipeTried(recipe)
+                        }}
+                      >
+                        {Boolean(recipe.isTried) ? (
+                          <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="m8.5 12.4 2.4 2.5 4.8-5.2" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                          </svg>
+                        )}
+                      </button>
                       <button
                         type="button"
                         className="dish-icon-button"
@@ -352,6 +397,7 @@ export default function SavedRecipesPage({
                   {recipe.link ? <p className="saved-recipe-link-preview">{recipe.link}</p> : null}
                   {recipe.notes ? <p>{recipe.notes}</p> : <p className="saved-recipe-muted">без нотаток</p>}
                   <time>{formatDate(recipe.createdAt)}</time>
+                  {Boolean(recipe.isTried) ? <p className="saved-recipe-tried-note">(виконано)</p> : null}
                 </article>
               )
             })()
@@ -457,6 +503,10 @@ export default function SavedRecipesPage({
             ) : (
               <p className="saved-recipe-muted">нотатки не додано</p>
             )}
+
+            <p className="saved-recipe-muted">
+              статус: {Boolean(selectedRecipe.isTried) ? 'виконано' : 'не виконано'}
+            </p>
 
           </section>
         </div>
