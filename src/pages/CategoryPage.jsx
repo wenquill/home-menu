@@ -187,6 +187,7 @@ export default function CategoryPage({
   const [favoriteToastMessage, setFavoriteToastMessage] = useState('')
   const [favoriteToastTimeoutId, setFavoriteToastTimeoutId] = useState(null)
   const [searchText, setSearchText] = useState('')
+  const [sortBy, setSortBy] = useState('newest')
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -236,7 +237,35 @@ export default function CategoryPage({
       })
     : filteredDishes
 
-  const isEmptyCategory = visibleDishes.length === 0
+  const sortedVisibleDishes = useMemo(() => {
+    const list = [...visibleDishes]
+
+    switch (sortBy) {
+      case 'oldest':
+        return list.sort((a, b) => a.id - b.id)
+      case 'name-asc':
+        return list.sort((a, b) => String(a.title || '').localeCompare(String(b.title || ''), 'uk'))
+      case 'name-desc':
+        return list.sort((a, b) => String(b.title || '').localeCompare(String(a.title || ''), 'uk'))
+      case 'time-asc':
+        return list.sort((a, b) => {
+          const timeA = Number.isFinite(Number(a.cookingTimeMinutes)) ? Number(a.cookingTimeMinutes) : Number.POSITIVE_INFINITY
+          const timeB = Number.isFinite(Number(b.cookingTimeMinutes)) ? Number(b.cookingTimeMinutes) : Number.POSITIVE_INFINITY
+          return timeA - timeB
+        })
+      case 'time-desc':
+        return list.sort((a, b) => {
+          const timeA = Number.isFinite(Number(a.cookingTimeMinutes)) ? Number(a.cookingTimeMinutes) : Number.NEGATIVE_INFINITY
+          const timeB = Number.isFinite(Number(b.cookingTimeMinutes)) ? Number(b.cookingTimeMinutes) : Number.NEGATIVE_INFINITY
+          return timeB - timeA
+        })
+      case 'newest':
+      default:
+        return list.sort((a, b) => b.id - a.id)
+    }
+  }, [visibleDishes, sortBy])
+
+  const isEmptyCategory = sortedVisibleDishes.length === 0
 
   useEffect(() => {
     if (!selectedDish && !isEditModalOpen && !dishToDelete && !menuScheduleDish) {
@@ -561,6 +590,18 @@ export default function CategoryPage({
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
         />
+        <select
+          aria-label="Сортування страв"
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value)}
+        >
+          <option value="newest">спочатку нові</option>
+          <option value="oldest">спочатку старі</option>
+          <option value="name-asc">назва: а-я</option>
+          <option value="name-desc">назва: я-а</option>
+          <option value="time-asc">час: менший-більший</option>
+          <option value="time-desc">час: більший-менший</option>
+        </select>
       </div>
 
       {isEmptyCategory ? (
@@ -573,7 +614,7 @@ export default function CategoryPage({
         </section>
       ) : (
         <section className="dish-grid" aria-label={dishListAriaLabel}>
-          {visibleDishes.map((dish) => (
+          {sortedVisibleDishes.map((dish) => (
             <DishCard
               key={`${dishKeyPrefix}-${dish.id}`}
               id={dish.id}
