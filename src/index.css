@@ -323,19 +323,23 @@ body {
   color: var(--muted);
 }
 
-.top-menu--strip .menu-link:hover {
-  color: var(--text);
-}
-
-.top-menu--strip .menu-link--active {
+.top-menu--strip .menu-link--active,
+.top-menu--strip .menu-link--active:hover,
+.top-menu--strip .menu-link--active:focus-visible {
   background: transparent;
   border-color: transparent;
   color: var(--accent-strong);
 }
 
-.top-menu--strip .menu-link--button:hover {
-  background: transparent;
-  border-color: transparent;
+@media (hover: hover) {
+  .top-menu--strip .menu-link:hover {
+    color: var(--text);
+  }
+
+  .top-menu--strip .menu-link--button:hover {
+    background: transparent;
+    border-color: transparent;
+  }
 }
 
 .menu-actions--categories {
