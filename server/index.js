@@ -7,6 +7,7 @@ import {
   addFavoriteDishForUserInProject,
   addShoppingItemInProject,
   addShoppingItemsInProject,
+  createSavedRecipeByUser,
   addProjectMembership,
   clearShoppingListInProject,
   countProjectMembers,
@@ -35,6 +36,7 @@ import {
   getProjectRoleForUser,
   getProjectsForUser,
   getShoppingListItemsByProject,
+  getSavedRecipesByUser,
   getProjectMembers,
   getRecentActivityLogsForUser,
   getUnreadActivityLogsCountForUser,
@@ -592,6 +594,38 @@ app.get('/api/favorites', authRequired, projectAccessRequired, (req, res) => {
 app.get('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
   const items = getShoppingListItemsByProject(req.projectId)
   return res.json({ items })
+})
+
+app.get('/api/saved-recipes', authRequired, (req, res) => {
+  const recipes = getSavedRecipesByUser(req.user.id)
+  return res.json({ recipes })
+})
+
+app.post('/api/saved-recipes', authRequired, (req, res) => {
+  const title = String(req.body.title || '').trim()
+  const link = String(req.body.link || '').trim()
+  const notes = String(req.body.notes || '').trim()
+
+  if (!title) {
+    return res.status(400).json({ message: 'Назва рецепта обовʼязкова' })
+  }
+
+  if (link && !/^https?:\/\//i.test(link)) {
+    return res.status(400).json({ message: 'Посилання має починатися з http:// або https://' })
+  }
+
+  try {
+    const recipe = createSavedRecipeByUser({
+      userId: req.user.id,
+      title,
+      link,
+      notes,
+    })
+
+    return res.status(201).json(recipe)
+  } catch (error) {
+    return res.status(400).json({ message: error.message || 'Не вдалося зберегти рецепт' })
+  }
 })
 
 app.post('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {

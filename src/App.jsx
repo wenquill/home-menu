@@ -10,6 +10,7 @@ import EditDishPage from './pages/EditDishPage'
 import MenuPage from './pages/MenuPage'
 import NoProjectAccessPage from './pages/NoProjectAccessPage'
 import ProfilePage from './pages/ProfilePage'
+import SavedRecipesPage from './pages/SavedRecipesPage'
 import ShoppingListPage from './pages/ShoppingListPage'
 
 const emptyMenu = {
@@ -408,6 +409,22 @@ function App() {
     )
   }
 
+  const handleLoadSavedRecipes = async () => {
+    const data = await apiRequest('/api/saved-recipes', {}, authToken)
+    return Array.isArray(data?.recipes) ? data.recipes : []
+  }
+
+  const handleCreateSavedRecipe = async (payload) => {
+    return apiRequest(
+      '/api/saved-recipes',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      authToken,
+    )
+  }
+
   const refreshProjectScopedData = async () => {
     const [menu, favorites, projects] = await Promise.all([
       apiRequest('/api/menu', {}, authToken),
@@ -561,7 +578,12 @@ function App() {
       return <Navigate to="/" replace />
     }
 
-    if (!hasProjectAccess && location.pathname !== '/profile' && location.pathname !== '/no-project') {
+    if (
+      !hasProjectAccess &&
+      location.pathname !== '/profile' &&
+      location.pathname !== '/no-project' &&
+      location.pathname !== '/saved-recipes'
+    ) {
       return <Navigate to="/no-project" replace />
     }
 
@@ -645,6 +667,15 @@ function App() {
               onLoadMenuEntries={handleGetMenuEntriesByDate}
               onRemoveMenuEntry={handleRemoveDishFromMenu}
             />
+          )}
+        />
+        <Route
+          path="/saved-recipes"
+          element={protectedContent(
+            <SavedRecipesPage
+              onLoadSavedRecipes={handleLoadSavedRecipes}
+              onCreateSavedRecipe={handleCreateSavedRecipe}
+            />,
           )}
         />
         <Route

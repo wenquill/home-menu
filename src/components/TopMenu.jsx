@@ -218,6 +218,9 @@ export default function TopMenu({
                     <NavLink to="/shopping-list" className={linkClass}>
                       Покупки
                     </NavLink>
+                    <NavLink to="/saved-recipes" className={linkClass}>
+                      Рецепти
+                    </NavLink>
                     <NavLink to="/favorites" className={linkClass}>
                       Улюблені
                     </NavLink>
@@ -256,6 +259,9 @@ export default function TopMenu({
                 </>
               ) : (
                 <div className="menu-strip-center menu-strip-center--locked">
+                  <NavLink to="/saved-recipes" className={linkClass}>
+                    Рецепти
+                  </NavLink>
                   <button
                     type="button"
                     className="menu-link menu-link--button"

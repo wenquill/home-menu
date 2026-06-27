@@ -530,6 +530,17 @@ export function initializeDatabase() {
       UNIQUE(project_id, normalized_text)
     );
 
+    CREATE TABLE IF NOT EXISTS saved_recipes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      link TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_user ON project_memberships(user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
@@ -543,6 +554,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
+    CREATE INDEX IF NOT EXISTS idx_saved_recipes_user ON saved_recipes(user_id);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -767,6 +779,25 @@ export function initializeDatabase() {
         UNIQUE(project_id, normalized_text)
       );
       CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
+    `)
+  }
+
+  const savedRecipesColumns = db.prepare("PRAGMA table_info('saved_recipes')").all()
+  const hasSavedRecipesTable = savedRecipesColumns.length > 0
+
+  if (!hasSavedRecipesTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS saved_recipes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        link TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_saved_recipes_user ON saved_recipes(user_id);
     `)
   }
 
@@ -1432,6 +1463,56 @@ export function clearShoppingListInProject(projectId) {
     .run(projectId)
 
   return Number(result.changes || 0)
+}
+
+export function getSavedRecipesByUser(userId) {
+  return db
+    .prepare(
+      `SELECT
+        id,
+        user_id AS userId,
+        title,
+        link,
+        notes,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM saved_recipes
+       WHERE user_id = ?
+       ORDER BY id DESC`,
+    )
+    .all(userId)
+}
+
+export function createSavedRecipeByUser({ userId, title, link = '', notes = '' }) {
+  const normalizedTitle = String(title || '').trim()
+  const normalizedLink = String(link || '').trim()
+  const normalizedNotes = String(notes || '').trim()
+
+  if (!normalizedTitle) {
+    throw new Error('Назва рецепта обовʼязкова')
+  }
+
+  const result = db
+    .prepare(
+      `INSERT INTO saved_recipes (user_id, title, link, notes)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .run(userId, normalizedTitle, normalizedLink, normalizedNotes)
+
+  return db
+    .prepare(
+      `SELECT
+        id,
+        user_id AS userId,
+        title,
+        link,
+        notes,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM saved_recipes
+       WHERE id = ?`,
+    )
+    .get(Number(result.lastInsertRowid))
 }
 
 export function getFavoriteDishIdsForUser(userId) {
