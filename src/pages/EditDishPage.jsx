@@ -17,6 +17,7 @@ export default function EditDishPage({
   const [dishTitle, setDishTitle] = useState('')
   const [dishDescription, setDishDescription] = useState('')
   const [dishRecipe, setDishRecipe] = useState('')
+  const [dishCookingTime, setDishCookingTime] = useState('')
   const [dishComponents, setDishComponents] = useState([''])
   const [mealCategoryId, setMealCategoryId] = useState('')
   const [typeCategoryId, setTypeCategoryId] = useState('')
@@ -32,6 +33,7 @@ export default function EditDishPage({
     setDishTitle(dish.title)
     setDishDescription(dish.description)
     setDishRecipe(dish.recipe || '')
+    setDishCookingTime(dish.cookingTimeMinutes ? String(dish.cookingTimeMinutes) : '')
     setDishComponents(dish.components?.length ? dish.components : [''])
     setMealCategoryId(String(dish.mealCategoryId))
     setTypeCategoryId(String(dish.typeCategoryId))
@@ -79,6 +81,7 @@ export default function EditDishPage({
         title: dishTitle,
         description: dishDescription,
         recipe: dishRecipe,
+        cookingTimeMinutes: dishCookingTime === '' ? null : Number(dishCookingTime),
         components: dishComponents,
         mealCategoryId: Number(mealCategoryId),
         typeCategoryId: Number(typeCategoryId),
@@ -121,6 +124,18 @@ export default function EditDishPage({
             rows={5}
             value={dishRecipe}
             onChange={(event) => setDishRecipe(event.target.value)}
+          />
+
+          <label htmlFor="edit-cooking-time">час приготування (хв)</label>
+          <input
+            id="edit-cooking-time"
+            type="number"
+            min="1"
+            max="1440"
+            step="1"
+            value={dishCookingTime}
+            onChange={(event) => setDishCookingTime(event.target.value)}
+            placeholder="наприклад, 35"
           />
 
           <label>компоненти (інгредієнти)</label>

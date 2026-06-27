@@ -5,6 +5,7 @@ function DishCard({
   id,
   title,
   description,
+  cookingTimeMinutes,
   components,
   mealCategoryName,
   typeCategoryName,
@@ -60,8 +61,8 @@ function DishCard({
               onToggleFavorite?.()
             }}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A6.01 6.01 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
           </button>
           {isAdmin ? (
@@ -76,8 +77,9 @@ function DishCard({
                   onEdit()
                 }}
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 17.25V21h3.75L18.81 8.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92-9.06 9.06zM20.71 5.63a1 1 0 000-1.41l-1.93-1.93a1 1 0 00-1.41 0l-1.5 1.5 3.75 3.75 1.09-1.09z" />
+                <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                 </svg>
               </button>
               <button
@@ -90,8 +92,12 @@ function DishCard({
                   onDelete()
                 }}
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 7h2v8h-2v-8zm4 0h2v8h-2v-8zM7 10h2v8H7v-8zm-1 10h12l1-13H5l1 13z" />
+                <svg viewBox="0 0 24 24" aria-hidden="true" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M8 6V4h8v2" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 10v7" />
+                  <path d="M14 10v7" />
                 </svg>
               </button>
             </>
@@ -111,6 +117,14 @@ function DishCard({
         <span>{mealCategoryName}</span>
         <span className="dish-card-categories-separator">/</span>
         <span>{typeCategoryName}</span>
+        {cookingTimeMinutes ? (
+          <span className="dish-card-time" aria-label={`час приготування ${cookingTimeMinutes} хвилин`} title="час приготування">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 110 16 8 8 0 010-16zm-1 3a1 1 0 012 0v4.38l2.45 2.45a1 1 0 01-1.42 1.42l-2.74-2.74A1 1 0 0111 12V7z" />
+            </svg>
+            <span>{cookingTimeMinutes}</span>
+          </span>
+        ) : null}
       </div>
       {onAddToMenu ? (
         <button
@@ -151,6 +165,7 @@ export default function CategoryPage({
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editRecipe, setEditRecipe] = useState('')
+  const [editCookingTime, setEditCookingTime] = useState('')
   const [editComponents, setEditComponents] = useState([''])
   const [editMealCategoryId, setEditMealCategoryId] = useState('')
   const [editTypeCategoryId, setEditTypeCategoryId] = useState('')
@@ -385,6 +400,7 @@ export default function CategoryPage({
     setEditTitle(detailedDish.title)
     setEditDescription(detailedDish.description || '')
     setEditRecipe(detailedDish.recipe || '')
+    setEditCookingTime(detailedDish.cookingTimeMinutes ? String(detailedDish.cookingTimeMinutes) : '')
     setEditComponents(detailedDish.components?.length ? detailedDish.components : [''])
     setEditMealCategoryId(String(detailedDish.mealCategoryId))
     setEditTypeCategoryId(String(detailedDish.typeCategoryId))
@@ -426,6 +442,7 @@ export default function CategoryPage({
         title: editTitle,
         description: editDescription,
         recipe: editRecipe,
+        cookingTimeMinutes: editCookingTime === '' ? null : Number(editCookingTime),
         components: editComponents,
         mealCategoryId: Number(editMealCategoryId),
         typeCategoryId: Number(editTypeCategoryId),
@@ -562,6 +579,7 @@ export default function CategoryPage({
               id={dish.id}
               title={dish.title}
               description={dish.description}
+              cookingTimeMinutes={dish.cookingTimeMinutes}
               components={dish.components}
               mealCategoryName={dish.mealCategoryName}
               typeCategoryName={dish.typeCategoryName}
@@ -608,6 +626,7 @@ export default function CategoryPage({
               </button>
             </div>
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
+            {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
             {selectedDish.recipe ? (
               <div className="dish-recipe-block">
                 <div className="dish-recipe-header">
@@ -690,6 +709,18 @@ export default function CategoryPage({
                 rows={5}
                 value={editRecipe}
                 onChange={(event) => setEditRecipe(event.target.value)}
+              />
+
+              <label htmlFor="edit-dish-cooking-time">час приготування (хв)</label>
+              <input
+                id="edit-dish-cooking-time"
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                value={editCookingTime}
+                onChange={(event) => setEditCookingTime(event.target.value)}
+                placeholder="наприклад, 35"
               />
 
               <label>компоненти (інгредієнти)</label>

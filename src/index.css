@@ -604,7 +604,6 @@ body {
 .dish-card-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
 }
 
 .dish-icon-button {
@@ -686,12 +685,41 @@ body {
   color: #8a8a8a;
 }
 
-.dish-card-categories span:not(.dish-card-categories-label):not(.dish-card-categories-separator) {
+.dish-card-categories > span:not(.dish-card-categories-label):not(.dish-card-categories-separator):not(.dish-card-time) {
   display: inline;
   padding: 0;
   border: 0;
   background: transparent;
   color: #2f2f2f;
+}
+
+.dish-card-time {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 900;
+  color: #2f2f2f;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
+.dish-card-time svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+  fill: currentColor;
+  opacity: 0.86;
+}
+
+.dish-card-time > span {
+  display: block;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .dish-add-to-menu-button {

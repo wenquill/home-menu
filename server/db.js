@@ -448,6 +448,7 @@ export function initializeDatabase() {
       title TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       recipe TEXT NOT NULL DEFAULT '',
+      cooking_time_minutes INTEGER,
       project_id INTEGER NOT NULL DEFAULT 1,
       meal_category_id INTEGER NOT NULL,
       type_category_id INTEGER NOT NULL,
@@ -572,10 +573,15 @@ export function initializeDatabase() {
 
   const dishColumns = db.prepare("PRAGMA table_info('dishes')").all()
   const hasRecipeColumn = dishColumns.some((column) => column.name === 'recipe')
+  const hasCookingTimeColumn = dishColumns.some((column) => column.name === 'cooking_time_minutes')
   const hasDishProjectColumn = dishColumns.some((column) => column.name === 'project_id')
 
   if (!hasRecipeColumn) {
     db.exec("ALTER TABLE dishes ADD COLUMN recipe TEXT NOT NULL DEFAULT ''")
+  }
+
+  if (!hasCookingTimeColumn) {
+    db.exec('ALTER TABLE dishes ADD COLUMN cooking_time_minutes INTEGER')
   }
 
   if (!hasDishProjectColumn) {
@@ -889,6 +895,7 @@ export function getDishes(categoryId) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -935,6 +942,7 @@ export function getDishesByProject(projectId, categoryId) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -958,6 +966,7 @@ export function getDishById(id) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -985,6 +994,7 @@ export function getDishByIdInProject(id, projectId) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -1015,6 +1025,7 @@ export function getMenuEntryById(id) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -1035,32 +1046,14 @@ export function getMenuEntryById(id) {
   return menuEntryWithComponents
 }
 
-export function createDish({ title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
+export function createDish({ title, description, recipe = '', cookingTimeMinutes = null, mealCategoryId, typeCategoryId, components = [] }) {
   const transaction = db.transaction(() => {
     const result = db
       .prepare(
-        `INSERT INTO dishes (title, description, recipe, meal_category_id, type_category_id)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .run(title, description, recipe, mealCategoryId, typeCategoryId)
-
-    const dishId = Number(result.lastInsertRowid)
-    replaceDishComponents(dishId, components)
-    return dishId
-  })
-
-  const dishId = transaction()
-  return getDishById(dishId)
-}
-
-export function createDishInProject({ title, description, recipe = '', projectId, mealCategoryId, typeCategoryId, components = [] }) {
-  const transaction = db.transaction(() => {
-    const result = db
-      .prepare(
-        `INSERT INTO dishes (title, description, recipe, project_id, meal_category_id, type_category_id)
+        `INSERT INTO dishes (title, description, recipe, cooking_time_minutes, meal_category_id, type_category_id)
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
-      .run(title, description, recipe, projectId, mealCategoryId, typeCategoryId)
+      .run(title, description, recipe, cookingTimeMinutes, mealCategoryId, typeCategoryId)
 
     const dishId = Number(result.lastInsertRowid)
     replaceDishComponents(dishId, components)
@@ -1071,13 +1064,31 @@ export function createDishInProject({ title, description, recipe = '', projectId
   return getDishById(dishId)
 }
 
-export function updateDish({ id, title, description, recipe = '', mealCategoryId, typeCategoryId, components = [] }) {
+export function createDishInProject({ title, description, recipe = '', cookingTimeMinutes = null, projectId, mealCategoryId, typeCategoryId, components = [] }) {
+  const transaction = db.transaction(() => {
+    const result = db
+      .prepare(
+        `INSERT INTO dishes (title, description, recipe, cooking_time_minutes, project_id, meal_category_id, type_category_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(title, description, recipe, cookingTimeMinutes, projectId, mealCategoryId, typeCategoryId)
+
+    const dishId = Number(result.lastInsertRowid)
+    replaceDishComponents(dishId, components)
+    return dishId
+  })
+
+  const dishId = transaction()
+  return getDishById(dishId)
+}
+
+export function updateDish({ id, title, description, recipe = '', cookingTimeMinutes = null, mealCategoryId, typeCategoryId, components = [] }) {
   const transaction = db.transaction(() => {
     db.prepare(
       `UPDATE dishes
-       SET title = ?, description = ?, recipe = ?, meal_category_id = ?, type_category_id = ?
+       SET title = ?, description = ?, recipe = ?, cooking_time_minutes = ?, meal_category_id = ?, type_category_id = ?
        WHERE id = ?`,
-    ).run(title, description, recipe, mealCategoryId, typeCategoryId, id)
+    ).run(title, description, recipe, cookingTimeMinutes, mealCategoryId, typeCategoryId, id)
 
     replaceDishComponents(id, components)
   })
@@ -1087,13 +1098,13 @@ export function updateDish({ id, title, description, recipe = '', mealCategoryId
   return getDishById(id)
 }
 
-export function updateDishInProject({ id, title, description, recipe = '', projectId, mealCategoryId, typeCategoryId, components = [] }) {
+export function updateDishInProject({ id, title, description, recipe = '', cookingTimeMinutes = null, projectId, mealCategoryId, typeCategoryId, components = [] }) {
   const transaction = db.transaction(() => {
     db.prepare(
       `UPDATE dishes
-       SET title = ?, description = ?, recipe = ?, meal_category_id = ?, type_category_id = ?
+       SET title = ?, description = ?, recipe = ?, cooking_time_minutes = ?, meal_category_id = ?, type_category_id = ?
        WHERE id = ? AND project_id = ?`,
-    ).run(title, description, recipe, mealCategoryId, typeCategoryId, id, projectId)
+    ).run(title, description, recipe, cookingTimeMinutes, mealCategoryId, typeCategoryId, id, projectId)
 
     replaceDishComponents(id, components)
   })
@@ -1187,6 +1198,7 @@ export function getMenuEntriesByDate(menuDate) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -1215,6 +1227,7 @@ export function getMenuEntriesByDateInProject(menuDate, projectId) {
         d.title,
         d.description,
         d.recipe,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         d.meal_category_id AS mealCategoryId,
         d.type_category_id AS typeCategoryId,
         meal.name AS mealCategoryName,
@@ -1248,6 +1261,7 @@ function getShoppingItemByIdInProject(id, projectId) {
         project_id AS projectId,
         text,
         is_checked AS isChecked,
+        d.cooking_time_minutes AS cookingTimeMinutes,
         sort_index AS sortIndex,
         created_at AS createdAt,
         updated_at AS updatedAt

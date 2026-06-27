@@ -666,6 +666,11 @@ app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwne
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
   const recipe = String(req.body.recipe || '').trim()
+  const cookingTimeMinutesRaw = req.body.cookingTimeMinutes
+  const cookingTimeMinutes =
+    cookingTimeMinutesRaw === null || cookingTimeMinutesRaw === undefined || String(cookingTimeMinutesRaw).trim() === ''
+      ? null
+      : Number(cookingTimeMinutesRaw)
   const mealCategoryId = Number(req.body.mealCategoryId)
   const typeCategoryId = Number(req.body.typeCategoryId)
   const components = Array.isArray(req.body.components) ? req.body.components : []
@@ -676,6 +681,13 @@ app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwne
 
   if (Number.isNaN(mealCategoryId) || Number.isNaN(typeCategoryId)) {
     return res.status(400).json({ message: 'Категорії страви мають бути числами' })
+  }
+
+  if (
+    cookingTimeMinutes !== null &&
+    (!Number.isInteger(cookingTimeMinutes) || cookingTimeMinutes < 1 || cookingTimeMinutes > 1440)
+  ) {
+    return res.status(400).json({ message: 'Час приготування має бути цілим числом від 1 до 1440 хвилин' })
   }
 
   const mealCategory = getCategoryByIdInProject(mealCategoryId, req.projectId)
@@ -694,6 +706,7 @@ app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwne
       title,
       description,
       recipe,
+      cookingTimeMinutes,
       projectId: req.projectId,
       mealCategoryId,
       typeCategoryId,
@@ -738,6 +751,11 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
   const title = String(req.body.title || '').trim()
   const description = String(req.body.description || '').trim()
   const recipe = String(req.body.recipe || '').trim()
+  const cookingTimeMinutesRaw = req.body.cookingTimeMinutes
+  const cookingTimeMinutes =
+    cookingTimeMinutesRaw === null || cookingTimeMinutesRaw === undefined || String(cookingTimeMinutesRaw).trim() === ''
+      ? null
+      : Number(cookingTimeMinutesRaw)
   const mealCategoryId = Number(req.body.mealCategoryId)
   const typeCategoryId = Number(req.body.typeCategoryId)
   const components = Array.isArray(req.body.components) ? req.body.components : []
@@ -752,6 +770,13 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
 
   if (Number.isNaN(mealCategoryId) || Number.isNaN(typeCategoryId)) {
     return res.status(400).json({ message: 'Категорії страви мають бути числами' })
+  }
+
+  if (
+    cookingTimeMinutes !== null &&
+    (!Number.isInteger(cookingTimeMinutes) || cookingTimeMinutes < 1 || cookingTimeMinutes > 1440)
+  ) {
+    return res.status(400).json({ message: 'Час приготування має бути цілим числом від 1 до 1440 хвилин' })
   }
 
   const existingDish = getDishByIdInProject(dishId, req.projectId)
@@ -776,6 +801,7 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
       title,
       description,
       recipe,
+      cookingTimeMinutes,
       projectId: req.projectId,
       mealCategoryId,
       typeCategoryId,

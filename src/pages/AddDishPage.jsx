@@ -13,6 +13,7 @@ export default function AddDishPage({
   const [dishTitle, setDishTitle] = useState('')
   const [dishDescription, setDishDescription] = useState('')
   const [dishRecipe, setDishRecipe] = useState('')
+  const [dishCookingTime, setDishCookingTime] = useState('')
   const [dishComponents, setDishComponents] = useState([''])
   const [mealCategoryId, setMealCategoryId] = useState('')
   const [typeCategoryId, setTypeCategoryId] = useState('')
@@ -41,6 +42,7 @@ export default function AddDishPage({
         title: dishTitle,
         description: dishDescription,
         recipe: dishRecipe,
+        cookingTimeMinutes: dishCookingTime === '' ? null : Number(dishCookingTime),
         components: dishComponents,
         mealCategoryId: Number(mealCategoryId),
         typeCategoryId: Number(typeCategoryId),
@@ -49,6 +51,7 @@ export default function AddDishPage({
       setDishTitle('')
       setDishDescription('')
       setDishRecipe('')
+      setDishCookingTime('')
       setDishComponents([''])
 
       if (embedded) {
@@ -113,6 +116,18 @@ export default function AddDishPage({
             onChange={(event) => setDishRecipe(event.target.value)}
             placeholder="кроки приготування"
             rows={5}
+          />
+
+          <label htmlFor="dish-cooking-time">час приготування (хв)</label>
+          <input
+            id="dish-cooking-time"
+            type="number"
+            min="1"
+            max="1440"
+            step="1"
+            value={dishCookingTime}
+            onChange={(event) => setDishCookingTime(event.target.value)}
+            placeholder="наприклад, 35"
           />
 
           <label>компоненти (інгредієнти)</label>

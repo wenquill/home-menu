@@ -63,6 +63,14 @@ function DishCard({ dish, onOpen, onRemoveFromMenu }) {
         <span>{dish.mealCategoryName}</span>
         <span className="dish-card-categories-separator">/</span>
         <span>{dish.typeCategoryName}</span>
+        {dish.cookingTimeMinutes ? (
+          <span className="dish-card-time" aria-label={`час приготування ${dish.cookingTimeMinutes} хвилин`} title="час приготування">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 110 16 8 8 0 010-16zm-1 3a1 1 0 012 0v4.38l2.45 2.45a1 1 0 01-1.42 1.42l-2.74-2.74A1 1 0 0111 12V7z" />
+            </svg>
+            <span>{dish.cookingTimeMinutes}</span>
+          </span>
+        ) : null}
       </div>
       <button
         type="button"
@@ -265,6 +273,7 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
               </button>
             </div>
             <p>{selectedDish.description || 'Опис поки не додано'}</p>
+            {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
             {selectedDish.recipe ? (
               <div className="dish-recipe-block">
                 <div className="dish-recipe-header">
