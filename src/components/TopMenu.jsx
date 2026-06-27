@@ -195,7 +195,8 @@ export default function TopMenu({
   }
 
   const isDishesPageActive =
-    location.pathname === '/' || location.pathname.startsWith('/category/')
+    location.pathname.startsWith('/category/')
+  const isDashboardActive = location.pathname === '/'
 
   return (
     <>
@@ -208,6 +209,12 @@ export default function TopMenu({
                   <div className="menu-strip-center">
                     <NavLink
                       to="/"
+                      className={isDashboardActive ? 'menu-link menu-link--active' : 'menu-link'}
+                    >
+                      Дашборд
+                    </NavLink>
+                    <NavLink
+                      to="/category/all"
                       className={isDishesPageActive ? 'menu-link menu-link--active' : 'menu-link'}
                     >
                       Страви

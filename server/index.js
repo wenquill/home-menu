@@ -28,6 +28,7 @@ import {
   getMenuEntryById,
   getCategories,
   getCategoriesByProject,
+  getDashboardStatsForMonth,
   getCategoryById,
   getCategoryByIdInProject,
   getMenuEntriesByDate,
@@ -596,6 +597,17 @@ app.get('/api/favorites', authRequired, projectAccessRequired, (req, res) => {
 app.get('/api/shopping-list', authRequired, projectAccessRequired, (req, res) => {
   const items = getShoppingListItemsByProject(req.projectId)
   return res.json({ items })
+})
+
+app.get('/api/dashboard/stats', authRequired, projectAccessRequired, (req, res) => {
+  const monthPrefix = new Date().toISOString().slice(0, 7)
+  const stats = getDashboardStatsForMonth({
+    projectId: req.projectId,
+    userId: req.user.id,
+    monthPrefix,
+  })
+
+  return res.json(stats)
 })
 
 app.get('/api/saved-recipes', authRequired, (req, res) => {

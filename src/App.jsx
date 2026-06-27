@@ -6,6 +6,7 @@ import AddDishPage from './pages/AddDishPage'
 import AuthPage from './pages/AuthPage'
 import CategoryPage from './pages/CategoryPage'
 import CurrentProjectPage from './pages/CurrentProjectPage'
+import DashboardPage from './pages/DashboardPage'
 import EditDishPage from './pages/EditDishPage'
 import MenuPage from './pages/MenuPage'
 import NoProjectAccessPage from './pages/NoProjectAccessPage'
@@ -73,8 +74,7 @@ function App() {
   const isAuthenticated = Boolean(currentUser)
 
   const isAdmin = currentUser?.role === 'ADMIN'
-  const showCategoryControls =
-    location.pathname === '/' || location.pathname.startsWith('/category/')
+  const showCategoryControls = location.pathname.startsWith('/category/')
 
   const defaultCategoryId =
     menuData.mealCategories[0]?.id ?? menuData.typeCategories[0]?.id ?? null
@@ -414,6 +414,10 @@ function App() {
     return Array.isArray(data?.recipes) ? data.recipes : []
   }
 
+  const handleLoadDashboardStats = async () => {
+    return apiRequest('/api/dashboard/stats', {}, authToken)
+  }
+
   const handleCreateSavedRecipe = async (payload) => {
     return apiRequest(
       '/api/saved-recipes',
@@ -637,11 +641,15 @@ function App() {
         <Route
           path="/"
           element={protectedContent(
-            defaultCategoryId ? (
-              <Navigate to={`/category/${defaultCategoryId}`} replace />
-            ) : (
-              emptyStateElement
-            )
+            <DashboardPage
+              dishes={menuData.dishes}
+              onLoadTodayMenuEntries={handleGetMenuEntriesByDate}
+              onLoadShoppingList={handleLoadShoppingList}
+              onLoadSavedRecipes={handleLoadSavedRecipes}
+              onLoadDashboardStats={handleLoadDashboardStats}
+              onScheduleDishToMenu={handleScheduleDishToMenu}
+              canManageProjectMenu={canManageProjectMenu}
+            />
           )}
         />
         <Route

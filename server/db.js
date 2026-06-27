@@ -1560,6 +1560,44 @@ export function deleteSavedRecipeByUser({ id, userId }) {
   return result.changes > 0
 }
 
+export function getDashboardStatsForMonth({ projectId, userId, monthPrefix }) {
+  const normalizedMonthPrefix = String(monthPrefix || '').trim()
+
+  const dishesRow = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM dishes
+       WHERE project_id = ?
+         AND SUBSTR(created_at, 1, 7) = ?`,
+    )
+    .get(projectId, normalizedMonthPrefix)
+
+  const recipesRow = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM saved_recipes
+       WHERE user_id = ?
+         AND SUBSTR(created_at, 1, 7) = ?`,
+    )
+    .get(userId, normalizedMonthPrefix)
+
+  const completedShoppingRow = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM shopping_list_items
+       WHERE project_id = ?
+         AND is_checked = 1
+         AND SUBSTR(updated_at, 1, 7) = ?`,
+    )
+    .get(projectId, normalizedMonthPrefix)
+
+  return {
+    newDishesCount: Number(dishesRow?.count || 0),
+    newSavedRecipesCount: Number(recipesRow?.count || 0),
+    completedPurchasesCount: Number(completedShoppingRow?.count || 0),
+  }
+}
+
 export function getFavoriteDishIdsForUser(userId) {
   const rows = db
     .prepare(
