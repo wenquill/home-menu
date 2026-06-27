@@ -57,6 +57,7 @@ async function apiRequest(path, options = {}, token = '') {
 
 function App() {
   const location = useLocation()
+  const [themeId, setThemeId] = useState(localStorage.getItem('themeId') || 'sunny')
   const [menuData, setMenuData] = useState(emptyMenu)
   const [isLoading, setIsLoading] = useState(true)
   const [pageError, setPageError] = useState('')
@@ -86,6 +87,12 @@ function App() {
     activeProjectMembership?.permissionsRole === 'EDITOR'
   const canViewProjectTab =
     isAdmin || activeProjectMembership?.role === 'OWNER'
+
+  useEffect(() => {
+    const nextTheme = String(themeId || 'sunny')
+    document.documentElement.setAttribute('data-theme', nextTheme)
+    localStorage.setItem('themeId', nextTheme)
+  }, [themeId])
 
   const loadMenuData = async ({ background = false } = {}) => {
     if (!background) {
@@ -700,6 +707,8 @@ function App() {
               onUpdateProfile={handleUpdateProfile}
               onCreateProject={handleCreateProject}
               onSwitchProject={handleSwitchCurrentProject}
+              selectedThemeId={themeId}
+              onThemeChange={setThemeId}
             />,
           )}
         />

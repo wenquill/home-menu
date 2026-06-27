@@ -19,6 +19,8 @@ export default function ProfilePage({
   onUpdateProfile,
   onCreateProject,
   onSwitchProject,
+  selectedThemeId = 'sunny',
+  onThemeChange,
 }) {
   const canManageProjects = currentUser?.role === 'ADMIN'
   const [displayName, setDisplayName] = useState('')
@@ -35,6 +37,18 @@ export default function ProfilePage({
   const [projectMessage, setProjectMessage] = useState('')
   const [projectError, setProjectError] = useState('')
   const [isProjectSubmitting, setIsProjectSubmitting] = useState(false)
+
+  const themeOptions = [
+    { id: 'sunny', label: 'Сонячна', swatch: '#ffd84d' },
+    { id: 'mint', label: 'Мʼятна', swatch: '#d7f3e7' },
+    { id: 'peach', label: 'Персикова', swatch: '#ffe5d6' },
+    { id: 'sky', label: 'Небесна', swatch: '#e0efff' },
+    { id: 'lavender', label: 'Лавандова', swatch: '#ece4ff' },
+    { id: 'rose', label: 'Рожева', swatch: '#ffdfe8' },
+    { id: 'sage', label: 'Шавлія', swatch: '#dfead9' },
+    { id: 'aqua', label: 'Аква', swatch: '#d9f3f5' },
+    { id: 'butter', label: 'Вершкова', swatch: '#fff2c9' },
+  ]
 
   useEffect(() => {
     if (!currentUser) {
@@ -211,6 +225,29 @@ export default function ProfilePage({
             onChange={(event) => setConfirmPassword(event.target.value)}
             placeholder="Повторіть новий пароль"
           />
+
+          <label>Тема акценту</label>
+          <div className="theme-picker" role="radiogroup" aria-label="Вибір теми">
+            {themeOptions.map((theme) => {
+              const isActive = selectedThemeId === theme.id
+
+              return (
+                <button
+                  key={theme.id}
+                  type="button"
+                  className={isActive ? 'theme-option theme-option--active' : 'theme-option'}
+                  onClick={() => onThemeChange?.(theme.id)}
+                  role="radio"
+                  aria-checked={isActive}
+                  aria-label={`Обрати тему ${theme.label}`}
+                  title={theme.label}
+                  style={{ '--theme-color': theme.swatch }}
+                >
+                  <span className="theme-option-sr-only">{theme.label}</span>
+                </button>
+              )
+            })}
+          </div>
 
           <button type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Зберігаю...' : 'Зберегти зміни'}
