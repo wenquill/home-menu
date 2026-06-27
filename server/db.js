@@ -1261,7 +1261,6 @@ function getShoppingItemByIdInProject(id, projectId) {
         project_id AS projectId,
         text,
         is_checked AS isChecked,
-        d.cooking_time_minutes AS cookingTimeMinutes,
         sort_index AS sortIndex,
         created_at AS createdAt,
         updated_at AS updatedAt
