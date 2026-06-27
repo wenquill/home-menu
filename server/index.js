@@ -21,6 +21,7 @@ import {
   createMenuEntry,
   createMenuEntryInProject,
   createProject,
+  deleteProjectById,
   deleteDish,
   deleteMenuEntryById,
   getDishById,
@@ -39,7 +40,7 @@ import {
   getProjectsForUser,
   getShoppingListItemsByProject,
   getSavedRecipesByUser,
-    updateSavedRecipeByUser,
+  updateSavedRecipeByUser,
   getProjectMembers,
   getRecentActivityLogsForUser,
   getUnreadActivityLogsCountForUser,
@@ -56,6 +57,7 @@ import {
   removeFavoriteDishForUserInProject,
   removeProjectMembership,
   setCurrentProjectForUser,
+  updateProjectById,
   updateProjectMemberPermissionsRole,
   updateShoppingItemCheckedInProject,
   updateUserById,
@@ -112,12 +114,22 @@ function adminRequired(req, res, next) {
 
 function resolveCurrentProjectId(user) {
   const preferredProjectId = Number(user?.currentProjectId)
-  if (Number.isInteger(preferredProjectId) && preferredProjectId > 0) {
+  if (
+    Number.isInteger(preferredProjectId) &&
+    preferredProjectId > 0 &&
+    isUserInProject(user.id, preferredProjectId)
+  ) {
     return preferredProjectId
   }
 
   const projects = getProjectsForUser(user.id)
-  return projects[0]?.id || null
+  const fallbackProjectId = projects[0]?.id || null
+
+  if (fallbackProjectId && fallbackProjectId !== preferredProjectId) {
+    setCurrentProjectForUser(user.id, fallbackProjectId)
+  }
+
+  return fallbackProjectId
 }
 
 function projectAccessRequired(req, res, next) {
@@ -128,11 +140,11 @@ function projectAccessRequired(req, res, next) {
   const projectId = resolveCurrentProjectId(req.user)
 
   if (!projectId) {
-    return res.status(403).json({ message: 'Вас ще не запрошено в жоден проєкт' })
+    return res.status(403).json({ message: 'У вас ще немає жодної дошки' })
   }
 
   if (!isUserInProject(req.user.id, projectId)) {
-    return res.status(403).json({ message: 'Ви не маєте доступу до поточного проєкту' })
+    return res.status(403).json({ message: 'Ви не маєте доступу до поточної дошки' })
   }
 
   req.projectId = projectId
@@ -150,7 +162,7 @@ function projectOwnerOrAdminRequired(req, res, next) {
 
   const role = getProjectRoleForUser(req.user.id, req.projectId)
   if (role !== 'OWNER') {
-    return res.status(403).json({ message: 'Потрібні права власника проєкту' })
+    return res.status(403).json({ message: 'Потрібні права власника дошки' })
   }
 
   return next()
@@ -279,31 +291,69 @@ app.get('/api/projects', authRequired, (req, res) => {
   })
 })
 
-app.post('/api/projects', authRequired, adminRequired, (req, res) => {
+app.post('/api/projects', authRequired, (req, res) => {
   const name = String(req.body.name || '').trim()
+  const notes = String(req.body.notes || '').trim()
+  const inviteEmails = Array.isArray(req.body.inviteEmails) ? req.body.inviteEmails : []
 
   if (!name) {
-    return res.status(400).json({ message: 'Назва проєкту обовʼязкова' })
+    return res.status(400).json({ message: 'Назва дошки обовʼязкова' })
   }
 
   if (name.length > 80) {
-    return res.status(400).json({ message: 'Назва проєкту має бути не довшою за 80 символів' })
+    return res.status(400).json({ message: 'Назва дошки має бути не довшою за 80 символів' })
+  }
+
+  if (notes.length > 600) {
+    return res.status(400).json({ message: 'Нотатки до дошки мають бути не довшими за 600 символів' })
   }
 
   const project = createProject({
     name,
+    notes,
     createdByUserId: req.user.id,
   })
+
+  const invited = []
+  const notFoundEmails = []
+
+  inviteEmails
+    .map((email) => String(email || '').trim().toLowerCase())
+    .filter((email) => email && email.includes('@'))
+    .forEach((email) => {
+      const invitedUser = getUserByEmail(email)
+
+      if (!invitedUser) {
+        notFoundEmails.push(email)
+        return
+      }
+
+      if (invitedUser.id === req.user.id) {
+        return
+      }
+
+      const wasAdded = addProjectMembership({
+        userId: invitedUser.id,
+        projectId: project.id,
+        role: 'MEMBER',
+      })
+
+      if (wasAdded) {
+        invited.push(email)
+      }
+    })
 
   const freshUser = getUserById(req.user.id)
 
   return res.status(201).json({
     project,
+    invited,
+    notFoundEmails,
     user: freshUser,
   })
 })
 
-app.put('/api/projects/current', authRequired, adminRequired, (req, res) => {
+app.put('/api/projects/current', authRequired, (req, res) => {
   const projectId = Number(req.body.projectId)
 
   if (Number.isNaN(projectId)) {
@@ -311,7 +361,7 @@ app.put('/api/projects/current', authRequired, adminRequired, (req, res) => {
   }
 
   if (!isUserInProject(req.user.id, projectId)) {
-    return res.status(403).json({ message: 'Ви не маєте доступу до цього проєкту' })
+    return res.status(403).json({ message: 'Ви не маєте доступу до цієї дошки' })
   }
 
   const updatedUser = setCurrentProjectForUser(req.user.id, projectId)
@@ -322,7 +372,7 @@ app.get('/api/projects/current', authRequired, projectAccessRequired, (req, res)
   const project = getProjectById(req.projectId)
 
   if (!project) {
-    return res.status(404).json({ message: 'Поточний проєкт не знайдено' })
+    return res.status(404).json({ message: 'Поточну дошку не знайдено' })
   }
 
   return res.json({
@@ -331,6 +381,63 @@ app.get('/api/projects/current', authRequired, projectAccessRequired, (req, res)
     permissionsRole: getProjectPermissionsRoleForUser(req.user.id, req.projectId),
     memberCount: countProjectMembers(req.projectId),
   })
+})
+
+app.put('/api/projects/current/info', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
+  const name = String(req.body.name || '').trim()
+  const notes = String(req.body.notes || '').trim()
+
+  if (!name) {
+    return res.status(400).json({ message: 'Назва дошки обовʼязкова' })
+  }
+
+  if (name.length > 80) {
+    return res.status(400).json({ message: 'Назва дошки має бути не довшою за 80 символів' })
+  }
+
+  if (notes.length > 600) {
+    return res.status(400).json({ message: 'Нотатки до дошки мають бути не довшими за 600 символів' })
+  }
+
+  const updated = updateProjectById({
+    projectId: req.projectId,
+    name,
+    notes,
+  })
+
+  if (!updated) {
+    return res.status(404).json({ message: 'Дошку не знайдено' })
+  }
+
+  return res.json(updated)
+})
+
+app.delete('/api/projects/:projectId', authRequired, (req, res) => {
+  const projectId = Number(req.params.projectId)
+
+  if (!Number.isInteger(projectId) || projectId < 1) {
+    return res.status(400).json({ message: 'Некоректний projectId' })
+  }
+
+  if (Number(req.user.currentProjectId) === projectId) {
+    return res.status(400).json({ message: 'Поточну дошку видаляти не можна' })
+  }
+
+  if (!isUserInProject(req.user.id, projectId)) {
+    return res.status(403).json({ message: 'Ви не маєте доступу до цієї дошки' })
+  }
+
+  const boardRole = getProjectRoleForUser(req.user.id, projectId)
+  if (req.user.role !== 'ADMIN' && boardRole !== 'OWNER') {
+    return res.status(403).json({ message: 'Видаляти дошку може лише її власник' })
+  }
+
+  const deleted = deleteProjectById(projectId)
+  if (!deleted) {
+    return res.status(404).json({ message: 'Дошку не знайдено' })
+  }
+
+  return res.status(204).send()
 })
 
 app.post('/api/projects/current/invite', authRequired, projectAccessRequired, projectOwnerOrAdminRequired, (req, res) => {
@@ -367,17 +474,17 @@ app.delete('/api/projects/current/members/:userId', authRequired, projectAccessR
   }
 
   if (userId === req.user.id) {
-    return res.status(400).json({ message: 'Ви не можете видалити себе з поточного проєкту' })
+    return res.status(400).json({ message: 'Ви не можете видалити себе з поточної дошки' })
   }
 
   const result = removeProjectMembership(userId, req.projectId)
 
   if (!result?.removed && result?.reason === 'LAST_OWNER') {
-    return res.status(400).json({ message: 'Не можна видалити останнього власника проєкту' })
+    return res.status(400).json({ message: 'Не можна видалити останнього власника дошки' })
   }
 
   if (!result?.removed) {
-    return res.status(404).json({ message: 'Учасника не знайдено в поточному проєкті' })
+    return res.status(404).json({ message: 'Учасника не знайдено в поточній дошці' })
   }
 
   return res.status(204).send()
@@ -402,7 +509,7 @@ app.put('/api/projects/current/members/:userId/role', authRequired, projectAcces
   })
 
   if (!updated) {
-    return res.status(404).json({ message: 'Учасника не знайдено в поточному проєкті' })
+    return res.status(404).json({ message: 'Учасника не знайдено в поточній дошці' })
   }
 
   return res.json(updated)

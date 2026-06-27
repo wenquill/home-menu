@@ -86,8 +86,7 @@ function App() {
     isAdmin ||
     activeProjectMembership?.role === 'OWNER' ||
     activeProjectMembership?.permissionsRole === 'EDITOR'
-  const canViewProjectTab =
-    isAdmin || activeProjectMembership?.role === 'OWNER'
+  const canViewProjectTab = hasProjectAccess
 
   useEffect(() => {
     const nextTheme = String(themeId || 'sunny')
@@ -462,22 +461,52 @@ function App() {
     setUserProjects(Array.isArray(projects?.projects) ? projects.projects : [])
   }
 
-  const handleCreateProject = async (name) => {
-    const payload = await apiRequest(
+  const handleCreateProject = async (input) => {
+    const boardPayload = typeof input === 'string'
+      ? { name: input }
+      : input
+
+    const response = await apiRequest(
       '/api/projects',
       {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(boardPayload),
       },
       authToken,
     )
 
-    if (payload?.user) {
-      setCurrentUser(payload.user)
+    if (response?.user) {
+      setCurrentUser(response.user)
     }
 
     await refreshProjectScopedData()
-    return payload.project
+    return response.project
+  }
+
+  const handleUpdateCurrentProjectInfo = async ({ name, notes }) => {
+    const updated = await apiRequest(
+      '/api/projects/current/info',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ name, notes }),
+      },
+      authToken,
+    )
+
+    await refreshProjectScopedData()
+    return updated
+  }
+
+  const handleDeleteProject = async (projectId) => {
+    await apiRequest(
+      `/api/projects/${projectId}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+
+    await refreshProjectScopedData()
   }
 
   const handleSwitchCurrentProject = async (projectId) => {
@@ -780,11 +809,16 @@ function App() {
             canViewProjectTab ? (
               <CurrentProjectPage
                 currentUser={currentUser}
+                projects={userProjects}
+                onCreateProject={handleCreateProject}
+                onSwitchProject={handleSwitchCurrentProject}
                 onLoadCurrentProject={handleLoadCurrentProject}
+                onUpdateCurrentProjectInfo={handleUpdateCurrentProjectInfo}
                 onInviteToCurrentProject={handleInviteToCurrentProject}
                 onLoadCurrentProjectMembers={handleLoadCurrentProjectMembers}
                 onRemoveMemberFromCurrentProject={handleRemoveMemberFromCurrentProject}
                 onUpdateMemberRoleInCurrentProject={handleUpdateMemberRoleInCurrentProject}
+                onDeleteProject={handleDeleteProject}
               />
             ) : (
               <Navigate to="/" replace />
@@ -793,7 +827,7 @@ function App() {
         />
         <Route
           path="/no-project"
-          element={protectedContent(<NoProjectAccessPage />)}
+          element={protectedContent(<NoProjectAccessPage onCreateBoard={handleCreateProject} />)}
         />
         <Route
           path="/login"

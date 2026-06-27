@@ -233,7 +233,7 @@ export default function TopMenu({
                     </NavLink>
                     {canViewProjectTab ? (
                       <NavLink to="/project" className={linkClass}>
-                        Проєкт
+                        Дошка
                       </NavLink>
                     ) : null}
                     <button

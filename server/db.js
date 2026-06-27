@@ -212,6 +212,10 @@ function normalizeProjectName(name) {
   return String(name || '').trim()
 }
 
+function normalizeProjectNotes(notes) {
+  return String(notes || '').trim()
+}
+
 function normalizeShoppingItemText(text) {
   return String(text || '').trim()
 }
@@ -417,6 +421,7 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
       created_by_user_id INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
@@ -671,18 +676,24 @@ export function initializeDatabase() {
 
   const projectColumns = db.prepare("PRAGMA table_info('projects')").all()
   const hasProjectsTable = projectColumns.length > 0
+  const hasProjectNotesColumn = projectColumns.some((column) => column.name === 'notes')
 
   if (!hasProjectsTable) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
         created_by_user_id INTEGER,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
       );
       CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
     `)
+  }
+
+  if (hasProjectsTable && !hasProjectNotesColumn) {
+    db.exec("ALTER TABLE projects ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
   }
 
   const membershipColumns = db.prepare("PRAGMA table_info('project_memberships')").all()
@@ -1662,6 +1673,7 @@ export function getProjectsForUser(userId) {
       `SELECT
         p.id,
         p.name,
+        p.notes,
         m.role,
         m.permissions_role AS permissionsRole,
         p.created_at AS createdAt
@@ -1679,6 +1691,7 @@ export function getProjectById(projectId) {
       `SELECT
         p.id,
         p.name,
+        p.notes,
         p.created_by_user_id AS createdByUserId,
         p.created_at AS createdAt
        FROM projects p
@@ -1687,12 +1700,13 @@ export function getProjectById(projectId) {
     .get(projectId)
 }
 
-export function createProject({ name, createdByUserId }) {
+export function createProject({ name, notes = '', createdByUserId }) {
   const normalizedName = normalizeProjectName(name)
+  const normalizedNotes = normalizeProjectNotes(notes)
 
   const result = db
-    .prepare('INSERT INTO projects (name, created_by_user_id) VALUES (?, ?)')
-    .run(normalizedName, createdByUserId || null)
+    .prepare('INSERT INTO projects (name, notes, created_by_user_id) VALUES (?, ?, ?)')
+    .run(normalizedName, normalizedNotes, createdByUserId || null)
 
   const projectId = Number(result.lastInsertRowid)
 
@@ -1703,6 +1717,37 @@ export function createProject({ name, createdByUserId }) {
     .run(projectId, createdByUserId)
 
   return getProjectById(projectId)
+}
+
+export function updateProjectById({ projectId, name, notes = '' }) {
+  const normalizedName = normalizeProjectName(name)
+  const normalizedNotes = normalizeProjectNotes(notes)
+
+  if (!normalizedName) {
+    throw new Error('Назва дошки обовʼязкова')
+  }
+
+  const result = db
+    .prepare(
+      `UPDATE projects
+       SET name = ?, notes = ?
+       WHERE id = ?`,
+    )
+    .run(normalizedName, normalizedNotes, projectId)
+
+  if (result.changes < 1) {
+    return null
+  }
+
+  return getProjectById(projectId)
+}
+
+export function deleteProjectById(projectId) {
+  const result = db
+    .prepare('DELETE FROM projects WHERE id = ?')
+    .run(projectId)
+
+  return result.changes > 0
 }
 
 export function addProjectMembership({ userId, projectId, role = 'MEMBER' }) {

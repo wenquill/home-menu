@@ -115,7 +115,6 @@ export default function ProfilePage({
 
     try {
       await onSwitchProject?.(Number(selectedProjectId))
-      setProjectMessage('поточний проєкт змінено')
     } catch (error) {
       setProjectError(error.message)
     } finally {
@@ -141,7 +140,6 @@ export default function ProfilePage({
       if (project?.id) {
         setSelectedProjectId(String(project.id))
       }
-      setProjectMessage('новий проєкт створено')
     } catch (error) {
       setProjectError(error.message)
     } finally {
