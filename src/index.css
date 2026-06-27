@@ -2580,6 +2580,10 @@ body {
   border-color: #e75480;
 }
 
+.save-profile-button {
+  margin-top: 20px;
+}
+
 @media (min-width: 640px) {
   .app-shell {
     padding: 10px 20px 30px;

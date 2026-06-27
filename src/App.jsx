@@ -59,7 +59,7 @@ async function apiRequest(path, options = {}, token = '') {
 
 function App() {
   const location = useLocation()
-  const [themeId, setThemeId] = useState(localStorage.getItem('themeId') || 'sunny')
+  const [themeId, setThemeId] = useState('sunny')
   const [menuData, setMenuData] = useState(emptyMenu)
   const [isLoading, setIsLoading] = useState(true)
   const [pageError, setPageError] = useState('')
@@ -89,10 +89,29 @@ function App() {
   const canViewProjectTab = hasProjectAccess
 
   useEffect(() => {
+    const userId = Number(currentUser?.id)
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      setThemeId('sunny')
+      return
+    }
+
+    const userThemeKey = `themeId:user:${userId}`
+    const storedTheme = localStorage.getItem(userThemeKey)
+    setThemeId(storedTheme || 'sunny')
+  }, [currentUser?.id])
+
+  useEffect(() => {
     const nextTheme = String(themeId || 'sunny')
     document.documentElement.setAttribute('data-theme', nextTheme)
-    localStorage.setItem('themeId', nextTheme)
-  }, [themeId])
+
+    const userId = Number(currentUser?.id)
+    if (!Number.isInteger(userId) || userId < 1) {
+      return
+    }
+
+    localStorage.setItem(`themeId:user:${userId}`, nextTheme)
+  }, [themeId, currentUser?.id])
 
   const loadMenuData = async ({ background = false } = {}) => {
     if (!background) {
@@ -635,8 +654,7 @@ function App() {
     if (
       !hasProjectAccess &&
       location.pathname !== '/profile' &&
-      location.pathname !== '/no-project' &&
-      location.pathname !== '/saved-recipes'
+      location.pathname !== '/no-project'
     ) {
       return <Navigate to="/no-project" replace />
     }

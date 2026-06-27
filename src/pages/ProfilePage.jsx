@@ -247,7 +247,7 @@ export default function ProfilePage({
             })}
           </div>
 
-          <button type="submit" disabled={isSubmitting}>
+          <button className="save-profile-button" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'зберігаю...' : 'зберегти зміни'}
           </button>
         </form>

@@ -257,32 +257,107 @@ function parseActivityLogDetails(detailsJson) {
   }
 }
 
-function getActivityLogRowsForUser(userId, limit = 50) {
-  return db
-    .prepare(
-      `SELECT
-        l.id,
-        l.actor_user_id AS actorUserId,
-        l.actor_email AS actorEmail,
-        u.display_name AS actorDisplayName,
-        l.action,
-        l.message,
-        l.details_json AS detailsJson,
-        l.created_at AS createdAt,
-        CASE
-          WHEN l.actor_user_id = ? OR r.activity_log_id IS NOT NULL THEN 1
-          ELSE 0
-        END AS isRead
-       FROM activity_logs l
-       LEFT JOIN users u
-         ON u.id = l.actor_user_id
-       LEFT JOIN activity_log_reads r
-         ON r.activity_log_id = l.id
-        AND r.user_id = ?
-       ORDER BY l.id DESC
-       LIMIT ?`,
-    )
-    .all(userId, userId, limit)
+function resolveActivityLogProjectId(actorUserId, projectId) {
+  const normalizedProjectId = Number(projectId)
+
+  if (Number.isInteger(normalizedProjectId) && normalizedProjectId > 0) {
+    return normalizedProjectId
+  }
+
+  const actorId = Number(actorUserId)
+  if (Number.isInteger(actorId) && actorId > 0) {
+    const row = db
+      .prepare(
+        `SELECT
+          u.current_project_id AS currentProjectId,
+          (
+            SELECT pm.project_id
+            FROM project_memberships pm
+            WHERE pm.user_id = u.id
+            ORDER BY pm.project_id ASC
+            LIMIT 1
+          ) AS firstProjectId
+         FROM users u
+         WHERE u.id = ?
+         LIMIT 1`,
+      )
+      .get(actorId)
+
+    const fallbackProjectId = Number(row?.currentProjectId)
+    if (Number.isInteger(fallbackProjectId) && fallbackProjectId > 0) {
+      return fallbackProjectId
+    }
+
+    const firstProjectId = Number(row?.firstProjectId)
+    if (Number.isInteger(firstProjectId) && firstProjectId > 0) {
+      return firstProjectId
+    }
+  }
+
+  return null
+}
+
+function getActivityLogRowsForUser(userId, limit = 50, projectId = null) {
+  const normalizedProjectId = Number(projectId)
+
+  const hasProjectFilter = Number.isInteger(normalizedProjectId) && normalizedProjectId > 0
+
+  const rows = hasProjectFilter
+    ? db
+      .prepare(
+        `SELECT
+          l.id,
+          l.actor_user_id AS actorUserId,
+          l.actor_email AS actorEmail,
+          u.display_name AS actorDisplayName,
+          l.action,
+          l.message,
+          l.project_id AS projectId,
+          l.details_json AS detailsJson,
+          l.created_at AS createdAt,
+          CASE
+            WHEN l.actor_user_id = ? OR r.activity_log_id IS NOT NULL THEN 1
+            ELSE 0
+          END AS isRead
+         FROM activity_logs l
+         LEFT JOIN users u
+           ON u.id = l.actor_user_id
+         LEFT JOIN activity_log_reads r
+           ON r.activity_log_id = l.id
+          AND r.user_id = ?
+         WHERE l.project_id = ?
+         ORDER BY l.id DESC
+         LIMIT ?`,
+      )
+      .all(userId, userId, normalizedProjectId, limit)
+    : db
+      .prepare(
+        `SELECT
+          l.id,
+          l.actor_user_id AS actorUserId,
+          l.actor_email AS actorEmail,
+          u.display_name AS actorDisplayName,
+          l.action,
+          l.message,
+          l.project_id AS projectId,
+          l.details_json AS detailsJson,
+          l.created_at AS createdAt,
+          CASE
+            WHEN l.actor_user_id = ? OR r.activity_log_id IS NOT NULL THEN 1
+            ELSE 0
+          END AS isRead
+         FROM activity_logs l
+         LEFT JOIN users u
+           ON u.id = l.actor_user_id
+         LEFT JOIN activity_log_reads r
+           ON r.activity_log_id = l.id
+          AND r.user_id = ?
+         ORDER BY l.id DESC
+         LIMIT ?`,
+      )
+      .all(userId, userId, limit)
+
+  return rows
     .map((row) => {
       const actorName = String(row.actorDisplayName || '').trim() || row.actorEmail
       const originalMessage = String(row.message || '')
@@ -1986,14 +2061,24 @@ export function updateUserById({ id, email, displayName, passwordHash, avatarUrl
   return getUserById(id)
 }
 
-export function createActivityLog({ actorUserId, actorEmail, action, message, details = {} }) {
+export function createActivityLog({ actorUserId, actorEmail, action, message, projectId, details = {} }) {
+  const resolvedProjectId = resolveActivityLogProjectId(actorUserId, projectId ?? details?.projectId)
+
+  if (!Number.isInteger(resolvedProjectId) || resolvedProjectId < 1) {
+    return null
+  }
+
   const normalizedDetails = normalizeActivityDetails(details)
+  const detailsWithProject = {
+    ...normalizedDetails,
+    projectId: resolvedProjectId,
+  }
 
   const result = db
     .prepare(
-      'INSERT INTO activity_logs (actor_user_id, actor_email, action, message, details_json) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO activity_logs (actor_user_id, actor_email, action, message, project_id, details_json) VALUES (?, ?, ?, ?, ?, ?)',
     )
-    .run(actorUserId, actorEmail, action, message, JSON.stringify(normalizedDetails))
+    .run(actorUserId, actorEmail, action, message, resolvedProjectId, JSON.stringify(detailsWithProject))
 
   return db
     .prepare(
@@ -2017,6 +2102,10 @@ export function getRecentActivityLogs(limit = 50) {
 
 export function getRecentActivityLogsForUser(userId, limit = 50) {
   return getActivityLogRowsForUser(userId, limit)
+}
+
+export function getRecentActivityLogsForUserInProject(userId, projectId, limit = 50) {
+  return getActivityLogRowsForUser(userId, limit, projectId)
 }
 
 export function markActivityLogsAsReadForUser(userId, logIds = []) {
@@ -2054,6 +2143,29 @@ export function getUnreadActivityLogsCountForUser(userId) {
          AND r.activity_log_id IS NULL`,
     )
     .get(userId, userId)
+
+  return Number(row?.count || 0)
+}
+
+export function getUnreadActivityLogsCountForUserInProject(userId, projectId) {
+  const normalizedProjectId = Number(projectId)
+
+  if (!Number.isInteger(normalizedProjectId) || normalizedProjectId < 1) {
+    return 0
+  }
+
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM activity_logs l
+       LEFT JOIN activity_log_reads r
+         ON r.activity_log_id = l.id
+        AND r.user_id = ?
+       WHERE l.actor_user_id != ?
+         AND l.project_id = ?
+         AND r.activity_log_id IS NULL`,
+    )
+    .get(userId, userId, normalizedProjectId)
 
   return Number(row?.count || 0)
 }

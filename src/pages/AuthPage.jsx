@@ -51,7 +51,7 @@ export default function AuthPage({ mode, onSubmitAuth }) {
                 type="text"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Ваше імʼя"
+                placeholder="ваше імʼя"
                 maxLength={60}
                 required
               />
@@ -79,7 +79,7 @@ export default function AuthPage({ mode, onSubmitAuth }) {
           />
 
           <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Зачекайте...' : isRegister ? 'Зареєструватись' : 'Увійти'}
+            {isSubmitting ? 'зачекайте...' : isRegister ? 'зареєструватись' : 'увійти'}
           </button>
         </form>
 
@@ -88,7 +88,7 @@ export default function AuthPage({ mode, onSubmitAuth }) {
         <p className="auth-alt-link">
           {isRegister ? 'Вже є акаунт?' : 'Ще немає акаунта?'}{' '}
           <Link to={isRegister ? '/login' : '/register'}>
-            {isRegister ? 'Увійти' : 'Зареєструватись'}
+            {isRegister ? 'увійти' : 'зареєструватись'}
           </Link>
         </p>
       </section>

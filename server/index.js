@@ -42,8 +42,8 @@ import {
   getSavedRecipesByUser,
   updateSavedRecipeByUser,
   getProjectMembers,
-  getRecentActivityLogsForUser,
-  getUnreadActivityLogsCountForUser,
+  getRecentActivityLogsForUserInProject,
+  getUnreadActivityLogsCountForUserInProject,
   markActivityLogsAsReadForUser,
   getDishes,
   getDishesByProject,
@@ -609,7 +609,7 @@ app.get('/api/activity-logs', authRequired, projectAccessRequired, (req, res) =>
     return res.status(400).json({ message: 'limit має бути числом від 1 до 300' })
   }
 
-  const logs = getRecentActivityLogsForUser(req.user.id, limit)
+  const logs = getRecentActivityLogsForUserInProject(req.user.id, req.projectId, limit)
 
   if (markAsRead && logs.length > 0) {
     markActivityLogsAsReadForUser(req.user.id, logs.map((log) => log.id))
@@ -620,7 +620,7 @@ app.get('/api/activity-logs', authRequired, projectAccessRequired, (req, res) =>
 })
 
 app.get('/api/activity-logs/unread-count', authRequired, projectAccessRequired, (req, res) => {
-  return res.json({ count: getUnreadActivityLogsCountForUser(req.user.id) })
+  return res.json({ count: getUnreadActivityLogsCountForUserInProject(req.user.id, req.projectId) })
 })
 
 app.get('/api/categories', authRequired, projectAccessRequired, (req, res) => {
@@ -652,6 +652,7 @@ app.post('/api/categories', authRequired, projectAccessRequired, projectEditorOr
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
+      projectId: req.projectId,
       action: 'CATEGORY_CREATED',
       message: `${actorName} створив(ла) нову категорію \"${category.name}\"`,
       details: {
@@ -939,6 +940,7 @@ app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwne
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
+      projectId: req.projectId,
       action: 'DISH_CREATED',
       message: `${actorName} створив(ла) нову страву \"${dish.title}\"`,
       details: {
@@ -952,6 +954,7 @@ app.post('/api/dishes', authRequired, projectAccessRequired, projectEditorOrOwne
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
+        projectId: req.projectId,
         action: 'DISH_COMPONENT_ADDED',
         message: `${actorName} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
         details: {
@@ -1034,6 +1037,7 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
+      projectId: req.projectId,
       action: 'DISH_UPDATED',
       message: `${actorName} редагував(ла) страву \"${dish.title}\"`,
       details: {
@@ -1049,6 +1053,7 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
+        projectId: req.projectId,
         action: 'DISH_COMPONENT_ADDED',
         message: `${actorName} додав(ла) компонент \"${componentName}\" до страви \"${dish.title}\"`,
         details: {
@@ -1063,6 +1068,7 @@ app.put('/api/dishes/:id', authRequired, projectAccessRequired, projectEditorOrO
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
+        projectId: req.projectId,
         action: 'DISH_COMPONENT_REMOVED',
         message: `${actorName} видалив(ла) компонент \"${componentName}\" зі страви \"${dish.title}\"`,
         details: {
@@ -1098,6 +1104,7 @@ app.delete('/api/dishes/:id', authRequired, projectAccessRequired, projectEditor
     addActivityLogSafe({
       actorUserId: req.user.id,
       actorEmail: req.user.email,
+      projectId: req.projectId,
       action: 'DISH_DELETED',
       message: `${actorName} видалив(ла) страву \"${existingDish.title}\"`,
       details: {
@@ -1155,6 +1162,7 @@ app.post('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
+        projectId: req.projectId,
         action: 'MENU_ENTRY_ADDED',
         message: `${actorName} додав(ла) до меню на ${menuDate} страву \"${dish.title}\"`,
         details: {
@@ -1201,6 +1209,7 @@ app.delete('/api/menu-plan/:id', authRequired, projectAccessRequired, (req, res)
       addActivityLogSafe({
         actorUserId: req.user.id,
         actorEmail: req.user.email,
+        projectId: req.projectId,
         action: 'MENU_ENTRY_REMOVED',
         message: `${actorName} прибрав(ла) з меню на ${menuEntry.menuDate} страву \"${menuEntry.title}\"`,
         details: {

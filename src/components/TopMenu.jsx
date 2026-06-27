@@ -248,8 +248,8 @@ export default function TopMenu({
                   <button
                     type="button"
                     className="menu-link menu-link--icon"
-                    aria-label="Відкрити логи активності"
-                    title="Логи активності"
+                    aria-label="Відкрити останні дії"
+                    title="останні дії"
                     onClick={() => {
                       void openActivity()
                     }}
@@ -266,8 +266,8 @@ export default function TopMenu({
                 </>
               ) : (
                 <div className="menu-strip-center menu-strip-center--locked">
-                  <NavLink to="/saved-recipes" className={linkClass}>
-                    Рецепти
+                  <NavLink to="/no-project" className={linkClass}>
+                    Головна
                   </NavLink>
                   <button
                     type="button"
@@ -330,11 +330,11 @@ export default function TopMenu({
             className="dish-modal activity-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Логи активності"
+            aria-label="Останні дії"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="dish-modal-header">
-              <h2>логи активності</h2>
+              <h2>останні дії</h2>
               <button
                 type="button"
                 className="dish-modal-close"
