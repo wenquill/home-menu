@@ -20,10 +20,12 @@ import {
   createDishInProject,
   createMenuEntry,
   createMenuEntryInProject,
+  createMenuSpecialEntryInProject,
   createProject,
   deleteProjectById,
   deleteDish,
   deleteMenuEntryById,
+  deleteMenuSpecialEntryByIdInProject,
   getDishById,
   getDishByIdInProject,
   getMenuEntryById,
@@ -34,6 +36,8 @@ import {
   getCategoryByIdInProject,
   getMenuEntriesByDate,
   getMenuEntriesByDateInProject,
+  getMenuSpecialEntriesByDateInProject,
+  getMenuSpecialEntryByIdInProject,
   getProjectById,
   getProjectPermissionsRoleForUser,
   getProjectRoleForUser,
@@ -1175,6 +1179,102 @@ app.get('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
   } catch (error) {
     return res.status(400).json({ message: error.message })
   }
+})
+
+app.get('/api/menu-special', authRequired, projectAccessRequired, (req, res) => {
+  const menuDate = String(req.query.date || '').trim()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
+    return res.status(400).json({ message: 'date має бути у форматі YYYY-MM-DD' })
+  }
+
+  try {
+    return res.json(getMenuSpecialEntriesByDateInProject(menuDate, req.projectId))
+  } catch (error) {
+    return res.status(400).json({ message: error.message })
+  }
+})
+
+app.post('/api/menu-special', authRequired, projectAccessRequired, (req, res) => {
+  const menuDate = String(req.body.menuDate || '').trim()
+  const sourceType = String(req.body.sourceType || '').trim().toUpperCase()
+  const title = String(req.body.title || '').trim()
+  const notes = String(req.body.notes || '').trim()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) {
+    return res.status(400).json({ message: 'menuDate має бути у форматі YYYY-MM-DD' })
+  }
+
+  if (!title) {
+    return res.status(400).json({ message: 'Назва альтернативного плану обовʼязкова' })
+  }
+
+  try {
+    const specialEntry = createMenuSpecialEntryInProject({
+      projectId: req.projectId,
+      menuDate,
+      sourceType,
+      title,
+      notes,
+      createdByUserId: req.user.id,
+    })
+
+    const actorName = req.user.displayName || req.user.email
+
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      projectId: req.projectId,
+      action: 'MENU_SPECIAL_ENTRY_ADDED',
+      message: `${actorName} додав(ла) альтернативний план на ${menuDate}: "${specialEntry.title}"`,
+      details: {
+        specialEntryId: specialEntry.id,
+        menuDate,
+        sourceType: specialEntry.sourceType,
+        title: specialEntry.title,
+      },
+    })
+
+    return res.status(201).json(specialEntry)
+  } catch (error) {
+    return res.status(400).json({ message: error.message || 'Не вдалося додати альтернативний план' })
+  }
+})
+
+app.delete('/api/menu-special/:id', authRequired, projectAccessRequired, (req, res) => {
+  const specialEntryId = Number(req.params.id)
+
+  if (!Number.isInteger(specialEntryId) || specialEntryId < 1) {
+    return res.status(400).json({ message: 'Некоректний id альтернативного плану' })
+  }
+
+  const existing = getMenuSpecialEntryByIdInProject(specialEntryId, req.projectId)
+  if (!existing) {
+    return res.status(404).json({ message: 'Альтернативний план не знайдено' })
+  }
+
+  const deleted = deleteMenuSpecialEntryByIdInProject({ id: specialEntryId, projectId: req.projectId })
+  if (!deleted) {
+    return res.status(404).json({ message: 'Альтернативний план не знайдено' })
+  }
+
+  const actorName = req.user.displayName || req.user.email
+
+  addActivityLogSafe({
+    actorUserId: req.user.id,
+    actorEmail: req.user.email,
+    projectId: req.projectId,
+    action: 'MENU_SPECIAL_ENTRY_REMOVED',
+    message: `${actorName} прибрав(ла) альтернативний план на ${existing.menuDate}: "${existing.title}"`,
+    details: {
+      specialEntryId,
+      menuDate: existing.menuDate,
+      sourceType: existing.sourceType,
+      title: existing.title,
+    },
+  })
+
+  return res.status(204).send()
 })
 
 app.post('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {

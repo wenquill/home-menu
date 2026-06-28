@@ -190,57 +190,6 @@ export default function DashboardPage({
             )}
           </article>
 
-          <article className="admin-panel dashboard-card dashboard-card--wide">
-            <div className="dashboard-card-header">
-              <h2>пропозиції</h2>
-            </div>
-            {suggestedDishes.length > 0 ? (
-              <div className="dashboard-suggestions">
-                {suggestedDishes.map((dish) => (
-                  <article key={dish.id} className="dashboard-suggestion-card">
-                    <div>
-                      <h3>{dish.title}</h3>
-                      <p>{dish.description || 'Опис поки не додано'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      className="dashboard-link-button"
-                      onClick={() => {
-                        void addSuggestionToMenu(dish)
-                      }}
-                      disabled={activeSuggestionId === dish.id}
-                    >
-                      {activeSuggestionId === dish.id ? 'додаю...' : 'додати до меню'}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <p className="dashboard-muted">Усі доступні страви вже додані на сьогодні або ще не створені.</p>
-            )}
-          </article>
-
-          <article className="admin-panel dashboard-card">
-            <div className="dashboard-card-header">
-              <h2>статистика</h2>
-              <span>{monthLabel}</span>
-            </div>
-            <div className="dashboard-stats">
-              <div className="dashboard-stat-item">
-                <strong>{stats.newDishesCount}</strong>
-                <span>нових страв</span>
-              </div>
-              <div className="dashboard-stat-item">
-                <strong>{stats.newSavedRecipesCount}</strong>
-                <span>нових рецептів</span>
-              </div>
-              <div className="dashboard-stat-item">
-                <strong>{stats.completedPurchasesCount}</strong>
-                <span>виконано покупок</span>
-              </div>
-            </div>
-          </article>
-
           <article className="admin-panel dashboard-card">
             <div className="dashboard-card-header">
               <h2>швидкі дії</h2>
@@ -268,6 +217,28 @@ export default function DashboardPage({
               </button>
             </div>
           </article>
+
+                    <article className="admin-panel dashboard-card">
+            <div className="dashboard-card-header">
+              <h2>статистика</h2>
+              <span>{monthLabel}</span>
+            </div>
+            <div className="dashboard-stats">
+              <div className="dashboard-stat-item">
+                <strong>{stats.newDishesCount}</strong>
+                <span>нових страв</span>
+              </div>
+              <div className="dashboard-stat-item">
+                <strong>{stats.newSavedRecipesCount}</strong>
+                <span>нових рецептів</span>
+              </div>
+              <div className="dashboard-stat-item">
+                <strong>{stats.completedPurchasesCount}</strong>
+                <span>виконано покупок</span>
+              </div>
+            </div>
+          </article>
+
         </section>
       ) : null}
     </main>

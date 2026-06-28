@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 function getTodayDateString() {
   return new Date().toISOString().slice(0, 10)
@@ -28,6 +29,18 @@ function formatMenuTitle(dateString) {
     month: 'long',
     year: 'numeric',
   }).format(date)}`
+}
+
+function getMenuSpecialSourceLabel(sourceType) {
+  if (sourceType === 'DELIVERY') {
+    return 'доставка'
+  }
+
+  if (sourceType === 'STORE_READY') {
+    return 'готове з магазину'
+  }
+
+  return 'інше'
 }
 
 function DishCard({ dish, onOpen, onRemoveFromMenu }) {
@@ -86,24 +99,70 @@ function DishCard({ dish, onOpen, onRemoveFromMenu }) {
   )
 }
 
-export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
+function SpecialPlanCard({ entry, onRemove }) {
+  return (
+    <article className="dish-card dish-card--menu-item" aria-label={`Альтернативний план ${entry.title}`}>
+      <div className="dish-card-header">
+        <h3>{entry.title}</h3>
+      </div>
+      <p>{entry.notes || 'Без додаткових нотаток'}</p>
+      <div className="dish-card-categories" aria-label="тип альтернативного плану">
+        <span className="dish-card-categories-label">тип:</span>
+        <span>{getMenuSpecialSourceLabel(entry.sourceType)}</span>
+      </div>
+      <button
+        type="button"
+        className="dish-add-to-menu-button dish-remove-from-menu-button"
+        onClick={() => {
+          onRemove()
+        }}
+      >
+        прибрати з меню
+      </button>
+    </article>
+  )
+}
+
+export default function MenuPage({
+  onLoadMenuEntries,
+  onRemoveMenuEntry,
+  onLoadSpecialMenuEntries,
+  onCreateSpecialMenuEntry,
+  onDeleteSpecialMenuEntry,
+}) {
+  const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState(getTodayDateString())
   const [menuEntries, setMenuEntries] = useState([])
+  const [specialEntries, setSpecialEntries] = useState([])
   const [pageError, setPageError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDish, setSelectedDish] = useState(null)
   const [copyMessage, setCopyMessage] = useState('')
   const [copyMessageTimeoutId, setCopyMessageTimeoutId] = useState(null)
+  const [activeTab, setActiveTab] = useState('COOK')
+  const [isSpecialModalOpen, setIsSpecialModalOpen] = useState(false)
+  const [isSubmittingSpecial, setIsSubmittingSpecial] = useState(false)
+  const [specialSourceType, setSpecialSourceType] = useState('DELIVERY')
+  const [specialTitle, setSpecialTitle] = useState('')
+  const [specialNotes, setSpecialNotes] = useState('')
 
   const title = useMemo(() => formatMenuTitle(selectedDate), [selectedDate])
+
+  const hasAnyPlans = menuEntries.length > 0 || specialEntries.length > 0
+  const isCookTab = activeTab === 'COOK'
+  const visibleItemsCount = isCookTab ? menuEntries.length : specialEntries.length
 
   const loadEntries = async () => {
     setIsLoading(true)
     setPageError('')
 
     try {
-      const entries = await onLoadMenuEntries(selectedDate)
-      setMenuEntries(entries)
+      const [entries, special] = await Promise.all([
+        onLoadMenuEntries(selectedDate),
+        onLoadSpecialMenuEntries?.(selectedDate),
+      ])
+      setMenuEntries(Array.isArray(entries) ? entries : [])
+      setSpecialEntries(Array.isArray(special) ? special : [])
     } catch (error) {
       setPageError(error.message)
     } finally {
@@ -119,9 +178,13 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
       setPageError('')
 
       try {
-        const entries = await onLoadMenuEntries(selectedDate)
+        const [entries, special] = await Promise.all([
+          onLoadMenuEntries(selectedDate),
+          onLoadSpecialMenuEntries?.(selectedDate),
+        ])
         if (isActive) {
-          setMenuEntries(entries)
+          setMenuEntries(Array.isArray(entries) ? entries : [])
+          setSpecialEntries(Array.isArray(special) ? special : [])
         }
       } catch (error) {
         if (isActive) {
@@ -139,7 +202,7 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
     return () => {
       isActive = false
     }
-  }, [onLoadMenuEntries, selectedDate])
+  }, [onLoadMenuEntries, onLoadSpecialMenuEntries, selectedDate])
 
   useEffect(() => {
     return () => {
@@ -214,6 +277,51 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
     await loadEntries()
   }
 
+  const closeSpecialModal = () => {
+    setIsSpecialModalOpen(false)
+    setSpecialSourceType('DELIVERY')
+    setSpecialTitle('')
+    setSpecialNotes('')
+  }
+
+  const addSpecialPlan = async (event) => {
+    event.preventDefault()
+    setPageError('')
+
+    if (!specialTitle.trim()) {
+      setPageError('Вкажіть назву альтернативного плану')
+      return
+    }
+
+    setIsSubmittingSpecial(true)
+
+    try {
+      await onCreateSpecialMenuEntry?.({
+        menuDate: selectedDate,
+        sourceType: specialSourceType,
+        title: specialTitle.trim(),
+        notes: specialNotes.trim(),
+      })
+      closeSpecialModal()
+      await loadEntries()
+    } catch (error) {
+      setPageError(error.message)
+    } finally {
+      setIsSubmittingSpecial(false)
+    }
+  }
+
+  const removeSpecialPlan = async (id) => {
+    setPageError('')
+
+    try {
+      await onDeleteSpecialMenuEntry?.(id)
+      await loadEntries()
+    } catch (error) {
+      setPageError(error.message)
+    }
+  }
+
   const selectedDishComponents = selectedDish?.components || []
 
   return (
@@ -233,29 +341,86 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
 
       <h1 className="category-title">{title}</h1>
 
+      <div className="menu-tab-switch" role="tablist" aria-label="Тип меню">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={isCookTab}
+          className={isCookTab ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+          onClick={() => setActiveTab('COOK')}
+        >
+          готуємо
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!isCookTab}
+          className={!isCookTab ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+          onClick={() => setActiveTab('NO_COOK')}
+        >
+          не готуємо
+        </button>
+      </div>
+
       {pageError ? <p className="state-message state-message--error">{pageError}</p> : null}
       {isLoading ? <p className="state-message">завантаження меню...</p> : null}
 
-      {!isLoading && !pageError && menuEntries.length === 0 ? (
+      {!isLoading && !pageError && !hasAnyPlans ? (
         <section className="empty-category-state">
-          <p>На цю дату ще не додано жодної страви.</p>
+          <p>На цю дату ще немає запланованих страв або альтернативних варіантів.</p>
         </section>
       ) : null}
 
-      {!isLoading && menuEntries.length > 0 ? (
-        <section className="dish-grid" aria-label={`Меню на ${selectedDate}`}>
-          {menuEntries.map((dish) => (
-            <DishCard
-              key={`${dish.menuEntryId}-${dish.id}`}
-              dish={dish}
-              onOpen={() => setSelectedDish(dish)}
-              onRemoveFromMenu={() => {
-                void removeFromMenu(dish.menuEntryId)
-              }}
-            />
-          ))}
+      {!isLoading && !pageError && hasAnyPlans && visibleItemsCount === 0 ? (
+        <section className="empty-category-state">
+          <p>{isCookTab ? 'У вкладці "готуємо" поки порожньо.' : 'У вкладці "не готуємо" поки порожньо.'}</p>
         </section>
       ) : null}
+
+      {!isLoading && visibleItemsCount > 0 ? (
+        <section className="dish-grid" aria-label={`Меню на ${selectedDate}`}>
+          {isCookTab
+            ? menuEntries.map((dish) => (
+              <DishCard
+                key={`dish-${dish.menuEntryId}-${dish.id}`}
+                dish={dish}
+                onOpen={() => setSelectedDish(dish)}
+                onRemoveFromMenu={() => {
+                  void removeFromMenu(dish.menuEntryId)
+                }}
+              />
+            ))
+            : specialEntries.map((entry) => (
+              <SpecialPlanCard
+                key={`special-${entry.id}`}
+                entry={entry}
+                onRemove={() => {
+                  void removeSpecialPlan(entry.id)
+                }}
+              />
+            ))}
+        </section>
+      ) : null}
+
+      <div className="menu-bottom-actions" aria-label="Дії меню">
+        {isCookTab ? (
+          <button
+            type="button"
+            className="menu-link menu-link--button menu-page-action-button"
+            onClick={() => navigate('/category/all')}
+          >
+            + додати страву
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="menu-link menu-link--button menu-page-action-button"
+            onClick={() => setIsSpecialModalOpen(true)}
+          >
+            + додати альтернативний варіант
+          </button>
+        )}
+      </div>
 
       {selectedDish ? (
         <div className="dish-modal-overlay" role="presentation" onClick={closeModals}>
@@ -308,6 +473,66 @@ export default function MenuPage({ onLoadMenuEntries, onRemoveMenuEntry }) {
               <span>{selectedDish.mealCategoryName}</span>
               <span>{selectedDish.typeCategoryName}</span>
             </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isSpecialModalOpen ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={closeSpecialModal}>
+          <section
+            className="dish-modal dish-modal--schedule"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Додати альтернативний план меню"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dish-modal-header">
+              <h2>альтернативний план</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={closeSpecialModal}>
+                ×
+              </button>
+            </div>
+
+            <form className="dish-modal-form" onSubmit={addSpecialPlan}>
+              <label htmlFor="menu-special-type">тип</label>
+              <select
+                id="menu-special-type"
+                value={specialSourceType}
+                onChange={(event) => setSpecialSourceType(event.target.value)}
+              >
+                <option value="DELIVERY">доставка</option>
+                <option value="STORE_READY">готове</option>
+                <option value="OTHER">інше</option>
+              </select>
+
+              <label htmlFor="menu-special-title">назва / що саме їмо</label>
+              <input
+                id="menu-special-title"
+                value={specialTitle}
+                onChange={(event) => setSpecialTitle(event.target.value)}
+                placeholder="наприклад: піца з доставки"
+                maxLength={120}
+                required
+              />
+
+              <label htmlFor="menu-special-notes">нотатки (необовʼязково)</label>
+              <textarea
+                id="menu-special-notes"
+                rows={4}
+                value={specialNotes}
+                onChange={(event) => setSpecialNotes(event.target.value)}
+                placeholder="додаткові деталі"
+              />
+
+              <div className="dish-modal-actions">
+                <button type="button" className="dish-modal-secondary" onClick={closeSpecialModal}>
+                  скасувати
+                </button>
+                <button type="submit" disabled={isSubmittingSpecial}>
+                  {isSubmittingSpecial ? 'додаю...' : 'додати в меню'}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       ) : null}

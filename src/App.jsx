@@ -354,6 +354,10 @@ function App() {
     return apiRequest(`/api/menu-plan?date=${encodeURIComponent(menuDate)}`, {}, authToken)
   }
 
+  const handleGetMenuSpecialEntriesByDate = async (menuDate) => {
+    return apiRequest(`/api/menu-special?date=${encodeURIComponent(menuDate)}`, {}, authToken)
+  }
+
   const handleScheduleDishToMenu = async ({ dishId, menuDate, components }) => {
     if (!isAuthenticated) {
       throw new Error('Потрібна авторизація')
@@ -372,6 +376,27 @@ function App() {
   const handleRemoveDishFromMenu = async (menuEntryId) => {
     return apiRequest(
       `/api/menu-plan/${menuEntryId}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+  }
+
+  const handleAddSpecialMenuEntry = async ({ menuDate, sourceType, title, notes }) => {
+    return apiRequest(
+      '/api/menu-special',
+      {
+        method: 'POST',
+        body: JSON.stringify({ menuDate, sourceType, title, notes }),
+      },
+      authToken,
+    )
+  }
+
+  const handleRemoveSpecialMenuEntry = async (id) => {
+    return apiRequest(
+      `/api/menu-special/${id}`,
       {
         method: 'DELETE',
       },
@@ -753,6 +778,9 @@ function App() {
             <MenuPage
               onLoadMenuEntries={handleGetMenuEntriesByDate}
               onRemoveMenuEntry={handleRemoveDishFromMenu}
+              onLoadSpecialMenuEntries={handleGetMenuSpecialEntriesByDate}
+              onCreateSpecialMenuEntry={handleAddSpecialMenuEntry}
+              onDeleteSpecialMenuEntry={handleRemoveSpecialMenuEntry}
             />
           )}
         />

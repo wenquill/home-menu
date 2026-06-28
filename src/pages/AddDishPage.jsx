@@ -192,7 +192,7 @@ export default function AddDishPage({
               type="submit"
               disabled={isSubmitting || mealCategories.length === 0 || typeCategories.length === 0}
             >
-              {isSubmitting ? 'зберігаю...' : 'додати страву'}
+              {isSubmitting ? 'зберігаю...' : '+ додати страву'}
             </button>
           </div>
         </form>

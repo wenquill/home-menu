@@ -220,6 +220,16 @@ function normalizeShoppingItemText(text) {
   return String(text || '').trim()
 }
 
+function normalizeMenuSpecialSourceType(sourceType) {
+  const value = String(sourceType || '').trim().toUpperCase()
+
+  if (value === 'DELIVERY' || value === 'STORE_READY' || value === 'HOMEMADE_GIFT' || value === 'OTHER') {
+    return value
+  }
+
+  throw new Error('Некоректний тип альтернативного плану')
+}
+
 function getMenuPlannedDishIdsByDate(menuDate) {
   const normalizedDate = normalizeMenuDate(menuDate)
 
@@ -623,6 +633,20 @@ export function initializeDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS menu_special_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      menu_date TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_by_user_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_projects_created_by ON projects(created_by_user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_user ON project_memberships(user_id);
     CREATE INDEX IF NOT EXISTS idx_project_memberships_project ON project_memberships(project_id);
@@ -637,6 +661,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_activity_log_reads_user ON activity_log_reads(user_id);
     CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
     CREATE INDEX IF NOT EXISTS idx_saved_recipes_user ON saved_recipes(user_id);
+    CREATE INDEX IF NOT EXISTS idx_menu_special_entries_project_date ON menu_special_entries(project_id, menu_date);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
   `)
 
@@ -901,6 +926,28 @@ export function initializeDatabase() {
     db.exec('ALTER TABLE saved_recipes ADD COLUMN tried_at TEXT')
   }
 
+  const menuSpecialColumns = db.prepare("PRAGMA table_info('menu_special_entries')").all()
+  const hasMenuSpecialTable = menuSpecialColumns.length > 0
+
+  if (!hasMenuSpecialTable) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS menu_special_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        menu_date TEXT NOT NULL,
+        source_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        created_by_user_id INTEGER,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_menu_special_entries_project_date ON menu_special_entries(project_id, menu_date);
+    `)
+  }
+
   const adminCount = db
     .prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'ADMIN'")
     .get()
@@ -930,6 +977,7 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_user_favorites_project ON user_favorites(project_id);
     CREATE INDEX IF NOT EXISTS idx_activity_logs_project ON activity_logs(project_id);
     CREATE INDEX IF NOT EXISTS idx_shopping_list_project ON shopping_list_items(project_id);
+    CREATE INDEX IF NOT EXISTS idx_menu_special_entries_project_date ON menu_special_entries(project_id, menu_date);
   `)
 
   const categoryCount = db.prepare('SELECT COUNT(*) AS count FROM categories').get()
@@ -1374,6 +1422,77 @@ export function getMenuEntriesByDateInProject(menuDate, projectId) {
     .all(normalizedDate, projectId)
 
   return attachMenuEntryComponents(menuEntries)
+}
+
+export function getMenuSpecialEntriesByDateInProject(menuDate, projectId) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+
+  return db
+    .prepare(
+      `SELECT
+        id,
+        project_id AS projectId,
+        menu_date AS menuDate,
+        source_type AS sourceType,
+        title,
+        notes,
+        created_by_user_id AS createdByUserId,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM menu_special_entries
+       WHERE project_id = ?
+         AND menu_date = ?
+       ORDER BY id DESC`,
+    )
+    .all(projectId, normalizedDate)
+}
+
+export function getMenuSpecialEntryByIdInProject(id, projectId) {
+  return db
+    .prepare(
+      `SELECT
+        id,
+        project_id AS projectId,
+        menu_date AS menuDate,
+        source_type AS sourceType,
+        title,
+        notes,
+        created_by_user_id AS createdByUserId,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+       FROM menu_special_entries
+       WHERE id = ?
+         AND project_id = ?`,
+    )
+    .get(id, projectId)
+}
+
+export function createMenuSpecialEntryInProject({ projectId, menuDate, sourceType, title, notes = '', createdByUserId = null }) {
+  const normalizedDate = normalizeMenuDate(menuDate)
+  const normalizedSourceType = normalizeMenuSpecialSourceType(sourceType)
+  const normalizedTitle = String(title || '').trim()
+  const normalizedNotes = String(notes || '').trim()
+
+  if (!normalizedTitle) {
+    throw new Error('Назва альтернативного плану обовʼязкова')
+  }
+
+  const result = db
+    .prepare(
+      `INSERT INTO menu_special_entries (project_id, menu_date, source_type, title, notes, created_by_user_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(projectId, normalizedDate, normalizedSourceType, normalizedTitle, normalizedNotes, createdByUserId)
+
+  return getMenuSpecialEntryByIdInProject(Number(result.lastInsertRowid), projectId)
+}
+
+export function deleteMenuSpecialEntryByIdInProject({ id, projectId }) {
+  const result = db
+    .prepare('DELETE FROM menu_special_entries WHERE id = ? AND project_id = ?')
+    .run(id, projectId)
+
+  return result.changes > 0
 }
 
 function getNextShoppingSortIndex(projectId) {
