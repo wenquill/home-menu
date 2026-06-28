@@ -367,13 +367,13 @@ export default function MenuPage({
 
       {!isLoading && !pageError && !hasAnyPlans ? (
         <section className="empty-category-state">
-          <p>На цю дату ще немає запланованих страв або альтернативних варіантів.</p>
+          <p>{isCookTab ? 'На цю дату ще немає запланованих страв.' : 'На цю дату ще немає запланованих альтернативних варіантів.'}</p>
         </section>
       ) : null}
 
       {!isLoading && !pageError && hasAnyPlans && visibleItemsCount === 0 ? (
         <section className="empty-category-state">
-          <p>{isCookTab ? 'У вкладці "готуємо" поки порожньо.' : 'У вкладці "не готуємо" поки порожньо.'}</p>
+          <p>{isCookTab ? 'На цю дату ще немає запланованих страв.' : 'На цю дату ще немає запланованих альтернативних варіантів.'}</p>
         </section>
       ) : null}
 

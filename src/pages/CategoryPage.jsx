@@ -156,6 +156,7 @@ export default function CategoryPage({
   onGetDishById,
   onScheduleDishToMenu,
 }) {
+  const ITEMS_PER_PAGE = 8
   const { categoryId } = useParams()
   const isFavoritesView = viewMode === 'favorites'
   const isAllDishesView = !isFavoritesView && categoryId === 'all'
@@ -188,6 +189,7 @@ export default function CategoryPage({
   const [favoriteToastTimeoutId, setFavoriteToastTimeoutId] = useState(null)
   const [searchText, setSearchText] = useState('')
   const [sortBy, setSortBy] = useState('newest')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const allCategories = useMemo(
     () => [...mealCategories, ...typeCategories],
@@ -264,6 +266,47 @@ export default function CategoryPage({
         return list.sort((a, b) => b.id - a.id)
     }
   }, [visibleDishes, sortBy])
+
+  const totalPages = Math.max(1, Math.ceil(sortedVisibleDishes.length / ITEMS_PER_PAGE))
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [categoryId, viewMode, normalizedSearch, sortBy])
+
+  useEffect(() => {
+    setCurrentPage((prev) => {
+      if (prev > totalPages) {
+        return totalPages
+      }
+
+      if (prev < 1) {
+        return 1
+      }
+
+      return prev
+    })
+  }, [totalPages])
+
+  const paginatedDishes = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return sortedVisibleDishes.slice(start, start + ITEMS_PER_PAGE)
+  }, [sortedVisibleDishes, currentPage])
+
+  const paginationPages = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_value, index) => index + 1)
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, 4, 5]
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+    }
+
+    return [currentPage - 2, currentPage - 1, currentPage, currentPage + 1, currentPage + 2]
+  }, [currentPage, totalPages])
 
   const isEmptyCategory = sortedVisibleDishes.length === 0
 
@@ -614,7 +657,7 @@ export default function CategoryPage({
         </section>
       ) : (
         <section className="dish-grid" aria-label={dishListAriaLabel}>
-          {sortedVisibleDishes.map((dish) => (
+          {paginatedDishes.map((dish) => (
             <DishCard
               key={`${dishKeyPrefix}-${dish.id}`}
               id={dish.id}
@@ -641,6 +684,43 @@ export default function CategoryPage({
           ))}
         </section>
       )}
+
+      {!isEmptyCategory && totalPages > 1 ? (
+        <nav className="dish-pagination" aria-label="Пагінація страв">
+          <button
+            type="button"
+            className="dish-pagination-button"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            попередня
+          </button>
+
+          <div className="dish-pagination-pages">
+            {paginationPages.map((page) => (
+              <button
+                key={`page-${page}`}
+                type="button"
+                className={page === currentPage ? 'dish-pagination-button dish-pagination-button--active' : 'dish-pagination-button'}
+                onClick={() => setCurrentPage(page)}
+                aria-label={`Сторінка ${page}`}
+                aria-current={page === currentPage ? 'page' : undefined}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="dish-pagination-button"
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+          >
+            наступна
+          </button>
+        </nav>
+      ) : null}
 
       {selectedDish && !isEditModalOpen ? (
         <div

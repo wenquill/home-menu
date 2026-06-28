@@ -604,6 +604,7 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
+  min-width: 0;
 }
 
 .saved-recipe-card {
@@ -614,6 +615,7 @@ body {
     #fff;
   padding: 12px;
   cursor: pointer;
+  min-width: 0;
 }
 
 .saved-recipe-card--tried {
@@ -634,6 +636,9 @@ body {
 }
 
 .saved-recipe-link-preview {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1026,6 +1031,43 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+}
+
+.dish-pagination {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dish-pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dish-pagination-button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dish-pagination-button--active {
+  border-color: var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-text);
+}
+
+.dish-pagination-button:disabled {
+  opacity: 0.52;
+  cursor: default;
 }
 
 .dish-card {
