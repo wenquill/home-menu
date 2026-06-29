@@ -312,6 +312,13 @@ function App() {
     return created
   }
 
+  const handleGenerateDishRecipe = async ({ title, description, components }) => {
+    return apiRequest('/api/ai/generate-recipe', {
+      method: 'POST',
+      body: JSON.stringify({ title, description, components }),
+    }, authToken)
+  }
+
   const handleUpdateDish = async ({ id, ...payload }) => {
     if (!canManageProjectMenu) {
       throw new Error('Недостатньо прав для редагування страв')
@@ -749,6 +756,7 @@ function App() {
               onUpdateDish={handleUpdateDish}
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
+              onGenerateDishRecipe={handleGenerateDishRecipe}
               onScheduleDishToMenu={handleScheduleDishToMenu}
             />
           )}
@@ -768,6 +776,7 @@ function App() {
               onUpdateDish={handleUpdateDish}
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
+              onGenerateDishRecipe={handleGenerateDishRecipe}
               onScheduleDishToMenu={handleScheduleDishToMenu}
             />
           )}
@@ -825,6 +834,7 @@ function App() {
                 mealCategories={menuData.mealCategories}
                 typeCategories={menuData.typeCategories}
                 onAddDish={handleAddDish}
+                onGenerateDishRecipe={handleGenerateDishRecipe}
               />
             ) : (
               <Navigate to="/login" replace />
@@ -961,6 +971,7 @@ function App() {
               mealCategories={menuData.mealCategories}
               typeCategories={menuData.typeCategories}
               onAddDish={handleAddDish}
+              onGenerateDishRecipe={handleGenerateDishRecipe}
               embedded
               onClose={closeAddModals}
               onSuccess={closeAddModals}

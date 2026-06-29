@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import bcrypt from 'bcryptjs'
 import cors from 'cors'
 import express from 'express'
@@ -76,6 +77,9 @@ const app = express()
 const PORT = Number(process.env.PORT || 4000)
 const JWT_SECRET = String(process.env.JWT_SECRET || 'dev-secret-change-me')
 const TOKEN_TTL = '7d'
+const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim()
+const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim()
+const OPENAI_API_URL = String(process.env.OPENAI_API_URL || 'https://api.openai.com/v1/chat/completions').trim()
 
 app.use(cors())
 app.use(express.json())
@@ -217,6 +221,138 @@ function getRemovedComponents(beforeComponents = [], afterComponents = []) {
     .map((item) => String(item).trim())
     .filter(Boolean)
     .filter((item) => !afterSet.has(item.toLowerCase()))
+}
+
+function clampCookingMinutes(minutes) {
+  if (!Number.isInteger(minutes)) {
+    return null
+  }
+
+  if (minutes < 1 || minutes > 1440) {
+    return null
+  }
+
+  return minutes
+}
+
+function extractCookingMinutesFromText(text) {
+  const normalized = String(text || '')
+
+  const strictLineMatch = normalized.match(/ЧАС_ХВ\s*:\s*(\d{1,4})/i)
+  if (strictLineMatch) {
+    return clampCookingMinutes(Number(strictLineMatch[1]))
+  }
+
+  const phraseMatch = normalized.match(/(?:час(?:\s+приготування)?|готувати|приготування)\s*[:\-]?\s*(\d{1,4})\s*(?:хв|хвилин|хвилини|min|minutes)/i)
+  if (phraseMatch) {
+    return clampCookingMinutes(Number(phraseMatch[1]))
+  }
+
+  const anyMinutesMatch = normalized.match(/(\d{1,4})\s*(?:хв|хвилин|хвилини|min|minutes)/i)
+  if (anyMinutesMatch) {
+    return clampCookingMinutes(Number(anyMinutesMatch[1]))
+  }
+
+  return null
+}
+
+function estimateCookingMinutesByHeuristic({ recipeText, componentsCount }) {
+  const stepCount = (String(recipeText || '').match(/(^|\n)\s*\d+[.)]/g) || []).length
+  const base = 12
+  const perStep = stepCount > 0 ? stepCount * 6 : 18
+  const perComponent = Math.max(0, Number(componentsCount || 0)) * 2
+  const estimated = Math.round((base + perStep + perComponent) / 5) * 5
+
+  return clampCookingMinutes(Math.min(120, Math.max(10, estimated)))
+}
+
+async function generateRecipeWithAI({ title, components, description }) {
+  if (!OPENAI_API_KEY) {
+    const configError = new Error('AI_UNAVAILABLE')
+    configError.code = 'AI_UNAVAILABLE'
+    throw configError
+  }
+
+  const systemPrompt = [
+    'Ти кулінарний помічник.',
+    'Згенеруй практичний покроковий рецепт українською мовою.',
+    'Перший рядок відповіді ОБОВʼЯЗКОВО: "ЧАС_ХВ: <число>".',
+    'Форматуй відповідь чітко у вигляді кроків: "1.", "2.", "3.".',
+    'Додай орієнтовний час для ключових етапів, якщо це доречно.',
+    'Використовуй інгредієнти з вхідних даних як основу.',
+    'Якщо чогось не вистачає, дозволено додати лише базові припущення (сіль, перець, олія, вода) і коротко це зазначити.',
+    'Не додавай зайвих вступів або пояснень поза рецептом.',
+  ].join(' ')
+
+  const userPrompt = [
+    `Назва страви: ${title}`,
+    `Інгредієнти: ${components.join(', ')}`,
+    description ? `Опис/побажання: ${description}` : 'Опис/побажання: немає',
+  ].join('\n')
+
+  const response = await fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      temperature: 0.45,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 700,
+    }),
+  })
+
+  if (!response.ok) {
+    let errorPayload = null
+
+    try {
+      errorPayload = await response.json()
+    } catch (_error) {
+      errorPayload = null
+    }
+
+    const serviceError = new Error('AI_SERVICE_ERROR')
+    serviceError.code = 'AI_SERVICE_ERROR'
+    serviceError.status = response.status
+    serviceError.providerError = errorPayload?.error || null
+    throw serviceError
+  }
+
+  const data = await response.json()
+  const rawContent = String(data?.choices?.[0]?.message?.content || '').trim()
+
+  if (!rawContent) {
+    const parseError = new Error('AI_EMPTY_RESPONSE')
+    parseError.code = 'AI_EMPTY_RESPONSE'
+    throw parseError
+  }
+
+  const parsedMinutes = extractCookingMinutesFromText(rawContent)
+
+  const recipe = rawContent
+    .replace(/^\s*ЧАС_ХВ\s*:\s*\d{1,4}\s*\n?/i, '')
+    .trim()
+
+  if (!recipe) {
+    const parseError = new Error('AI_EMPTY_RESPONSE')
+    parseError.code = 'AI_EMPTY_RESPONSE'
+    throw parseError
+  }
+
+  const cookingTimeMinutes = parsedMinutes || estimateCookingMinutesByHeuristic({
+    recipeText: recipe,
+    componentsCount: components.length,
+  })
+
+  return {
+    recipe,
+    cookingTimeMinutes,
+  }
 }
 
 app.get('/api/health', (_req, res) => {
@@ -700,6 +836,87 @@ app.get('/api/dishes/:id', authRequired, projectAccessRequired, (req, res) => {
   }
 
   return res.json(dish)
+})
+
+app.post('/api/ai/generate-recipe', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, async (req, res) => {
+  const title = String(req.body.title || '').trim()
+  const description = String(req.body.description || '').trim()
+  const components = Array.isArray(req.body.components)
+    ? req.body.components.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+
+  if (!title) {
+    return res.status(400).json({ message: 'Для AI-генерації вкажіть назву страви' })
+  }
+
+  if (title.length > 140) {
+    return res.status(400).json({ message: 'Назва страви має бути не довшою за 140 символів' })
+  }
+
+  if (description.length > 1200) {
+    return res.status(400).json({ message: 'Опис має бути не довшим за 1200 символів' })
+  }
+
+  if (components.length === 0) {
+    return res.status(400).json({ message: 'Для AI-генерації додайте хоча б один інгредієнт' })
+  }
+
+  if (components.length > 30) {
+    return res.status(400).json({ message: 'Максимум 30 інгредієнтів для AI-генерації' })
+  }
+
+  try {
+    const generated = await generateRecipeWithAI({
+      title,
+      description,
+      components,
+    })
+
+    const actorName = req.user.displayName || req.user.email
+
+    addActivityLogSafe({
+      actorUserId: req.user.id,
+      actorEmail: req.user.email,
+      projectId: req.projectId,
+      action: 'AI_RECIPE_GENERATED',
+      message: `${actorName} згенерував(ла) AI-рецепт для страви "${title}"`,
+      details: {
+        dishTitle: title,
+        componentCount: components.length,
+      },
+    })
+
+    return res.json(generated)
+  } catch (error) {
+    if (error?.code === 'AI_UNAVAILABLE') {
+      return res.status(503).json({ message: 'AI-генерація недоступна: налаштуйте OPENAI_API_KEY на сервері' })
+    }
+
+    if (error?.code === 'AI_SERVICE_ERROR') {
+      const providerErrorCode = String(error?.providerError?.code || '').toLowerCase()
+      const providerErrorType = String(error?.providerError?.type || '').toLowerCase()
+
+      if (error?.status === 429 || providerErrorCode === 'insufficient_quota' || providerErrorType === 'insufficient_quota') {
+        return res.status(429).json({
+          message: 'AI-генерація недоступна: вичерпано квоту OpenAI. Перевірте billing/ліміти акаунта.',
+        })
+      }
+
+      if (error?.status === 401) {
+        return res.status(401).json({
+          message: 'AI-генерація недоступна: OpenAI API key недійсний або відкликаний.',
+        })
+      }
+
+      if (error?.status === 404 || providerErrorCode === 'model_not_found') {
+        return res.status(400).json({
+          message: `AI-генерація недоступна: модель ${OPENAI_MODEL} не знайдено або немає доступу.`,
+        })
+      }
+    }
+
+    return res.status(502).json({ message: 'Не вдалося згенерувати рецепт через AI. Спробуйте ще раз' })
+  }
 })
 
 app.get('/api/favorites', authRequired, projectAccessRequired, (req, res) => {

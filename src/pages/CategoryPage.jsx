@@ -154,6 +154,7 @@ export default function CategoryPage({
   onUpdateDish,
   onDeleteDish,
   onGetDishById,
+  onGenerateDishRecipe,
   onScheduleDishToMenu,
 }) {
   const ITEMS_PER_PAGE = 8
@@ -162,6 +163,7 @@ export default function CategoryPage({
   const isAllDishesView = !isFavoritesView && categoryId === 'all'
   const selectedCategoryId = Number(categoryId)
   const [selectedDish, setSelectedDish] = useState(null)
+  const [dishViewTab, setDishViewTab] = useState('details')
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDescription, setEditDescription] = useState('')
@@ -170,8 +172,10 @@ export default function CategoryPage({
   const [editComponents, setEditComponents] = useState([''])
   const [editMealCategoryId, setEditMealCategoryId] = useState('')
   const [editTypeCategoryId, setEditTypeCategoryId] = useState('')
+  const [editStep, setEditStep] = useState(1)
   const [editError, setEditError] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [isGeneratingEditRecipe, setIsGeneratingEditRecipe] = useState(false)
   const [dishToDelete, setDishToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState('')
   const [isDeletingDish, setIsDeletingDish] = useState(false)
@@ -199,6 +203,23 @@ export default function CategoryPage({
     () => new Set((favoriteDishIds || []).map((id) => Number(id))),
     [favoriteDishIds],
   )
+
+  const recipeSteps = useMemo(() => {
+    const recipeText = String(selectedDish?.recipe || '').trim()
+
+    if (!recipeText) {
+      return []
+    }
+
+    const matches = [...recipeText.matchAll(/(?:^|\n)\s*(\d+)[.)]\s+([\s\S]*?)(?=(?:\n\s*\d+[.)]\s+)|$)/g)]
+    const steps = matches
+      .map((match) => String(match[2] || '').trim())
+      .filter(Boolean)
+
+    return steps.length >= 2 ? steps : []
+  }, [selectedDish?.recipe])
+
+  const hasStructuredRecipeSteps = recipeSteps.length > 0
 
   const category = allCategories.find((item) => item.id === selectedCategoryId)
 
@@ -348,7 +369,9 @@ export default function CategoryPage({
 
   const closeModals = () => {
     setSelectedDish(null)
+    setDishViewTab('details')
     setIsEditModalOpen(false)
+    setEditStep(1)
     setDishToDelete(null)
     setEditError('')
     setDeleteError('')
@@ -460,6 +483,7 @@ export default function CategoryPage({
   }
 
   const openDishModal = async (dish) => {
+    setDishViewTab('details')
     setSelectedDish(dish)
     const detailedDish = await loadDishDetails(dish)
     setSelectedDish(detailedDish)
@@ -476,6 +500,7 @@ export default function CategoryPage({
     setEditComponents(detailedDish.components?.length ? detailedDish.components : [''])
     setEditMealCategoryId(String(detailedDish.mealCategoryId))
     setEditTypeCategoryId(String(detailedDish.typeCategoryId))
+    setEditStep(1)
     setEditError('')
     setIsEditModalOpen(true)
   }
@@ -496,6 +521,83 @@ export default function CategoryPage({
 
       return prev.filter((_item, idx) => idx !== index)
     })
+  }
+
+  const extractMinutesFromRecipeText = (text) => {
+    const normalized = String(text || '')
+    const match = normalized.match(/(\d{1,4})\s*(хв|хвилин|хвилини|min|minutes)/i)
+
+    if (!match) {
+      return null
+    }
+
+    const parsed = Number(match[1])
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 1440) {
+      return null
+    }
+
+    return parsed
+  }
+
+  const generateEditRecipeWithAi = async () => {
+    const normalizedTitle = editTitle.trim()
+    const normalizedDescription = editDescription.trim()
+    const normalizedComponents = editComponents.map((item) => String(item || '').trim()).filter(Boolean)
+
+    if (!normalizedTitle) {
+      setEditError('Для AI-генерації спочатку вкажіть назву страви')
+      return
+    }
+
+    if (normalizedComponents.length === 0) {
+      setEditError('Для AI-генерації додайте хоча б один інгредієнт')
+      return
+    }
+
+    if (!onGenerateDishRecipe) {
+      setEditError('AI-генерація тимчасово недоступна')
+      return
+    }
+
+    setEditError('')
+    setIsGeneratingEditRecipe(true)
+
+    try {
+      const generated = await onGenerateDishRecipe({
+        title: normalizedTitle,
+        description: normalizedDescription,
+        components: normalizedComponents,
+      })
+
+      const recipeText = String(generated?.recipe || '').trim()
+      if (!recipeText) {
+        throw new Error('AI повернув порожню відповідь. Спробуйте ще раз')
+      }
+
+      setEditRecipe(recipeText)
+
+      const apiMinutes = Number(generated?.cookingTimeMinutes)
+      const fallbackMinutes = extractMinutesFromRecipeText(recipeText)
+      const nextMinutes = Number.isInteger(apiMinutes) && apiMinutes > 0 ? apiMinutes : fallbackMinutes
+
+      if (nextMinutes) {
+        setEditCookingTime(String(nextMinutes))
+      }
+    } catch (error) {
+      setEditError(error.message)
+    } finally {
+      setIsGeneratingEditRecipe(false)
+    }
+  }
+
+  const goToEditStepTwo = () => {
+    setEditError('')
+    setEditStep(2)
+  }
+
+  const goToEditStepOne = () => {
+    setEditError('')
+    setEditStep(1)
   }
 
   const submitEdit = async (event) => {
@@ -620,6 +722,8 @@ export default function CategoryPage({
       // Silent fail here to avoid blocking modal/card interactions.
     }
   }
+
+  const isEditStepOneReady = editTitle.trim().length > 0
 
   return (
     <main className="category-page">
@@ -746,10 +850,50 @@ export default function CategoryPage({
                 ×
               </button>
             </div>
-            <p>{selectedDish.description || 'Опис поки не додано'}</p>
-            {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
-            {selectedDish.recipe ? (
-              <div className="dish-recipe-block">
+            <div className="menu-tab-switch dish-view-switch" role="tablist" aria-label="Вкладки страви">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={dishViewTab === 'details'}
+                className={dishViewTab === 'details' ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+                onClick={() => setDishViewTab('details')}
+              >
+                деталі
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={dishViewTab === 'recipe'}
+                className={dishViewTab === 'recipe' ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+                onClick={() => setDishViewTab('recipe')}
+              >
+                рецепт
+              </button>
+            </div>
+
+            {dishViewTab === 'details' ? (
+              <>
+              {selectedDish.description && (
+                <p>{selectedDish.description}</p>
+              )}
+                {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
+                {selectedDish.components?.length ? (
+                  <div className="dish-components-block">
+                    <p>компоненти:</p>
+                    <ul>
+                      {selectedDish.components.map((component, index) => (
+                        <li key={`${selectedDish.id}-component-${index}`}>{component}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <div className="dish-modal-tags">
+                  <span>{selectedDish.mealCategoryName}</span>
+                  <span>{selectedDish.typeCategoryName}</span>
+                </div>
+              </>
+            ) : selectedDish.recipe ? (
+              <div className="dish-recipe-block dish-recipe-block--tab">
                 <div className="dish-recipe-header">
                   <p>рецепт:</p>
                   <button
@@ -764,24 +908,34 @@ export default function CategoryPage({
                     </svg>
                   </button>
                 </div>
-                <pre>{selectedDish.recipe}</pre>
+
+                {hasStructuredRecipeSteps ? (
+                  <ol className="dish-recipe-timeline" aria-label="Кроки рецепта">
+                    {recipeSteps.map((stepText, index) => {
+                      const stepNumber = index + 1
+                      const isLast = stepNumber === recipeSteps.length
+
+                      return (
+                        <li key={`${selectedDish.id}-recipe-step-${stepNumber}`} className="dish-recipe-timeline-step">
+                          <div className="dish-recipe-timeline-rail" aria-hidden="true">
+                            <span className="dish-recipe-timeline-node">{stepNumber}</span>
+                            {!isLast ? <span className="dish-recipe-timeline-line" /> : null}
+                          </div>
+                          <div className="dish-recipe-timeline-content">
+                            <p>{stepText}</p>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ol>
+                ) : (
+                  <pre>{selectedDish.recipe}</pre>
+                )}
                 {copyMessage ? <p className="dish-copy-message">{copyMessage}</p> : null}
               </div>
-            ) : null}
-            {selectedDish.components?.length ? (
-              <div className="dish-components-block">
-                <p>компоненти:</p>
-                <ul>
-                  {selectedDish.components.map((component, index) => (
-                    <li key={`${selectedDish.id}-component-${index}`}>{component}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <div className="dish-modal-tags">
-              <span>{selectedDish.mealCategoryName}</span>
-              <span>{selectedDish.typeCategoryName}</span>
-            </div>
+            ) : (
+              <p className="dish-recipe-empty">Рецепт поки не додано</p>
+            )}
           </section>
         </div>
       ) : null}
@@ -807,105 +961,147 @@ export default function CategoryPage({
               </button>
             </div>
 
-            <form className="dish-modal-form" onSubmit={submitEdit}>
-              <label htmlFor="edit-dish-title">назва</label>
-              <input
-                id="edit-dish-title"
-                value={editTitle}
-                onChange={(event) => setEditTitle(event.target.value)}
-                required
-              />
+            <form className="admin-form admin-form-progress" onSubmit={submitEdit}>
+              <div className="add-dish-progress" role="progressbar" aria-valuemin={1} aria-valuemax={2} aria-valuenow={editStep}>
+                <div className="add-dish-progress-line" aria-hidden="true">
+                  <span className={`add-dish-progress-node ${editStep >= 1 ? 'is-complete' : ''} ${editStep === 1 ? 'is-active' : ''}`}>
+                    1
+                  </span>
+                  <span className={`add-dish-progress-node ${editStep >= 2 ? 'is-complete' : ''} ${editStep === 2 ? 'is-active' : ''}`}>
+                    2
+                  </span>
+                  <span className="add-dish-progress-fill" style={{ width: editStep === 1 ? '0%' : '100%' }} />
+                </div>
+                <div className="add-dish-progress-head">
+                  <span className={editStep === 1 ? 'is-active' : ''}>Основа</span>
+                  <span className={editStep === 2 ? 'is-active' : ''}>Рецепт</span>
+                </div>
+              </div>
 
-              <label htmlFor="edit-dish-description">опис</label>
-              <textarea
-                id="edit-dish-description"
-                rows={3}
-                value={editDescription}
-                onChange={(event) => setEditDescription(event.target.value)}
-              />
+              {editStep === 1 ? (
+                <>
+                  <label htmlFor="edit-dish-title">назва</label>
+                  <input
+                    id="edit-dish-title"
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    required
+                  />
 
-              <label htmlFor="edit-dish-recipe">рецепт</label>
-              <textarea
-                id="edit-dish-recipe"
-                rows={5}
-                value={editRecipe}
-                onChange={(event) => setEditRecipe(event.target.value)}
-              />
+                  <label htmlFor="edit-dish-description">опис</label>
+                  <textarea
+                    id="edit-dish-description"
+                    rows={3}
+                    value={editDescription}
+                    onChange={(event) => setEditDescription(event.target.value)}
+                  />
 
-              <label htmlFor="edit-dish-cooking-time">час приготування (хв)</label>
-              <input
-                id="edit-dish-cooking-time"
-                type="number"
-                min="1"
-                max="1440"
-                step="1"
-                value={editCookingTime}
-                onChange={(event) => setEditCookingTime(event.target.value)}
-                placeholder="наприклад, 35"
-              />
-
-              <label>компоненти (інгредієнти)</label>
-              <div className="component-list">
-                {editComponents.map((component, index) => (
-                  <div className="component-row" key={`modal-edit-component-${index}`}>
-                    <input
-                      value={component}
-                      onChange={(event) => updateEditComponentAt(index, event.target.value)}
-                      placeholder="наприклад, авокадо"
-                    />
-                    <button
-                      type="button"
-                      className="component-remove-btn"
-                      onClick={() => removeEditComponentField(index)}
-                      aria-label="видалити компонент"
-                    >
-                      ×
+                  <label>компоненти (інгредієнти)</label>
+                  <div className="component-list">
+                    {editComponents.map((component, index) => (
+                      <div className="component-row" key={`modal-edit-component-${index}`}>
+                        <input
+                          value={component}
+                          onChange={(event) => updateEditComponentAt(index, event.target.value)}
+                          placeholder="наприклад, авокадо"
+                        />
+                        <button
+                          type="button"
+                          className="component-remove-btn"
+                          onClick={() => removeEditComponentField(index)}
+                          aria-label="видалити компонент"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className="component-add-btn" onClick={addEditComponentField}>
+                      + додати компонент
                     </button>
                   </div>
-                ))}
-                <button type="button" className="component-add-btn" onClick={addEditComponentField}>
-                  + додати компонент
-                </button>
-              </div>
 
-              <label htmlFor="edit-dish-meal-category">категорія за часом дня</label>
-              <select
-                id="edit-dish-meal-category"
-                value={editMealCategoryId}
-                onChange={(event) => setEditMealCategoryId(event.target.value)}
-                required
-              >
-                {mealCategories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name.toLowerCase()}
-                  </option>
-                ))}
-              </select>
+                  <div className="admin-form-actions">
+                    <button type="button" className="dish-modal-secondary" onClick={closeModals}>
+                      скасувати
+                    </button>
+                    <button type="button" onClick={goToEditStepTwo} disabled={!isEditStepOneReady}>
+                      далі
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="admin-field-heading">
+                    <label htmlFor="edit-dish-recipe">рецепт</label>
+                    <button
+                      type="button"
+                      className="admin-ai-generate-btn"
+                      onClick={generateEditRecipeWithAi}
+                      disabled={isSavingEdit || isGeneratingEditRecipe}
+                    >
+                      {isGeneratingEditRecipe ? 'генерую...' : 'згенерувати рецепт'}
+                    </button>
+                  </div>
+                  <p className="admin-ai-hint">AI може автоматично згенерувати кроки і приблизний час приготування.</p>
+                  <textarea
+                    id="edit-dish-recipe"
+                    rows={7}
+                    value={editRecipe}
+                    onChange={(event) => setEditRecipe(event.target.value)}
+                  />
 
-              <label htmlFor="edit-dish-type-category">категорія за видом страви</label>
-              <select
-                id="edit-dish-type-category"
-                value={editTypeCategoryId}
-                onChange={(event) => setEditTypeCategoryId(event.target.value)}
-                required
-              >
-                {typeCategories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name.toLowerCase()}
-                  </option>
-                ))}
-              </select>
+                  <label htmlFor="edit-dish-cooking-time">час приготування (хв)</label>
+                  <input
+                    id="edit-dish-cooking-time"
+                    type="number"
+                    min="1"
+                    max="1440"
+                    step="1"
+                    value={editCookingTime}
+                    onChange={(event) => setEditCookingTime(event.target.value)}
+                    placeholder="автоматично від AI або введіть вручну"
+                  />
+
+                  <label htmlFor="edit-dish-meal-category">категорія за часом дня</label>
+                  <select
+                    id="edit-dish-meal-category"
+                    value={editMealCategoryId}
+                    onChange={(event) => setEditMealCategoryId(event.target.value)}
+                    required
+                  >
+                    {mealCategories.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+
+                  <label htmlFor="edit-dish-type-category">категорія за видом страви</label>
+                  <select
+                    id="edit-dish-type-category"
+                    value={editTypeCategoryId}
+                    onChange={(event) => setEditTypeCategoryId(event.target.value)}
+                    required
+                  >
+                    {typeCategories.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="admin-form-actions">
+                    <button type="button" className="dish-modal-secondary" onClick={goToEditStepOne}>
+                      назад
+                    </button>
+                    <button type="submit" disabled={isSavingEdit}>
+                      {isSavingEdit ? 'зберігаю...' : 'зберегти зміни'}
+                    </button>
+                  </div>
+                </>
+              )}
 
               {editError ? <p className="state-message state-message--error">{editError}</p> : null}
-
-              <div className="dish-modal-actions">
-                <button type="button" className="dish-modal-secondary" onClick={closeModals}>
-                  скасувати
-                </button>
-                <button type="submit" disabled={isSavingEdit}>
-                  {isSavingEdit ? 'зберігаю...' : 'зберегти зміни'}
-                </button>
-              </div>
             </form>
           </section>
         </div>

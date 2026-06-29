@@ -1587,10 +1587,6 @@ body {
   flex: 0 0 auto;
 }
 
-.admin-panel--modal {
-  margin-top: 12px;
-}
-
 .admin-panel--modal .admin-form {
   margin-bottom: 0;
 }
@@ -1734,6 +1730,15 @@ body {
   margin-top: 12px;
 }
 
+.dish-recipe-block--tab {
+  margin-top: 10px;
+}
+
+.dish-view-switch {
+  margin-top: 10px;
+  margin-bottom: 2px;
+}
+
 .dish-recipe-header {
   display: flex;
   align-items: center;
@@ -1765,6 +1770,59 @@ body {
   font: inherit;
   color: var(--text);
   line-height: 1.45;
+}
+
+.dish-recipe-timeline {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.dish-recipe-timeline-step {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 10px;
+}
+
+.dish-recipe-timeline-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dish-recipe-timeline-node {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid var(--btn-border);
+  background: #fff;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dish-recipe-timeline-line {
+  margin-top: 4px;
+  width: 2px;
+  flex: 1;
+  min-height: 16px;
+  background: linear-gradient(180deg, var(--btn-border), rgba(15, 23, 42, 0.15));
+  border-radius: 999px;
+}
+
+.dish-recipe-timeline-content p {
+  margin: 0;
+  color: var(--text);
+}
+
+.dish-recipe-empty {
+  margin-top: 12px;
 }
 
 .menu-schedule-options {
@@ -1922,7 +1980,6 @@ body {
 .dish-modal-tags {
   margin-top: 14px;
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -1934,6 +1991,8 @@ body {
   background: #fff;
   font-size: 13px;
   font-weight: 700;
+  text-align: center;
+  width: 100%;
 }
 
 .dish-modal-close {
@@ -1954,7 +2013,6 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 32px;
 }
 
 .dish-modal-header h2 {
@@ -2038,11 +2096,6 @@ body {
 .admin-panel-list {
   text-align: center;
 }
-
-.admin-panel--modal {
-  margin-top: 12px;
-}
-
 .admin-panel h2 {
   margin: 0 0 10px;
   font-size: 20px;
@@ -2059,10 +2112,137 @@ body {
   font-size: 16px;
 }
 
+.add-dish-progress {
+  margin-bottom: 6px;
+}
+
+.add-dish-progress-head {
+  display: flex;
+  justify-content: space-around;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.add-dish-progress-head span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.add-dish-progress-head .is-active {
+  color: var(--text);
+}
+
+.add-dish-progress-line {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.add-dish-progress-line::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.add-dish-progress-fill {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  transition: width 180ms ease;
+}
+
+.add-dish-progress-node {
+  position: relative;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  border: 2px solid rgba(15, 23, 42, 0.22);
+  background: #fff;
+  color: var(--muted);
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.add-dish-progress-node.is-complete {
+  border-color: var(--btn-border);
+  color: var(--text);
+}
+
+.add-dish-progress-node.is-active {
+  transform: scale(1.04);
+}
+
+.add-dish-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.add-dish-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--btn-border), #f59e0b);
+  transition: width 180ms ease;
+}
+
 .admin-form label {
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
+}
+
+.admin-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-field-heading label {
+  margin: 0;
+}
+
+.admin-ai-generate-btn {
+  width: auto !important;
+  border: 1px solid var(--line) !important;
+  background: #fff !important;
+  color: var(--text) !important;
+  padding: 6px 10px !important;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-ai-generate-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.admin-ai-hint {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .admin-form input,
@@ -2103,7 +2283,7 @@ body {
   margin-top: 2px;
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 .admin-form-actions button {
@@ -2524,7 +2704,7 @@ body {
 }
 
 .menu-tab-switch {
-  margin: -2px 0 12px;
+  margin: 12px 0 12px;
   width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
