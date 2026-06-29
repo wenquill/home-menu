@@ -137,6 +137,7 @@ export default function MenuPage({
   const [pageError, setPageError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDish, setSelectedDish] = useState(null)
+  const [dishViewTab, setDishViewTab] = useState('details')
   const [copyMessage, setCopyMessage] = useState('')
   const [copyMessageTimeoutId, setCopyMessageTimeoutId] = useState(null)
   const [activeTab, setActiveTab] = useState('COOK')
@@ -147,6 +148,24 @@ export default function MenuPage({
   const [specialNotes, setSpecialNotes] = useState('')
 
   const title = useMemo(() => formatMenuTitle(selectedDate), [selectedDate])
+  const selectedDishComponents = selectedDish?.components || []
+
+  const recipeSteps = useMemo(() => {
+    const recipeText = String(selectedDish?.recipe || '').trim()
+
+    if (!recipeText) {
+      return []
+    }
+
+    const matches = [...recipeText.matchAll(/(?:^|\n)\s*(\d+)[.)]\s+([\s\S]*?)(?=(?:\n\s*\d+[.)]\s+)|$)/g)]
+    const steps = matches
+      .map((match) => String(match[2] || '').trim())
+      .filter(Boolean)
+
+    return steps.length >= 2 ? steps : []
+  }, [selectedDish?.recipe])
+
+  const hasStructuredRecipeSteps = recipeSteps.length > 0
 
   const hasAnyPlans = menuEntries.length > 0 || specialEntries.length > 0
   const isCookTab = activeTab === 'COOK'
@@ -220,6 +239,7 @@ export default function MenuPage({
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         setSelectedDish(null)
+        setDishViewTab('details')
         setCopyMessage('')
       }
     }
@@ -230,6 +250,7 @@ export default function MenuPage({
 
   const closeModals = () => {
     setSelectedDish(null)
+    setDishViewTab('details')
     setCopyMessage('')
     if (copyMessageTimeoutId) {
       window.clearTimeout(copyMessageTimeoutId)
@@ -321,8 +342,6 @@ export default function MenuPage({
       setPageError(error.message)
     }
   }
-
-  const selectedDishComponents = selectedDish?.components || []
 
   return (
     <main className="category-page menu-page">
@@ -437,10 +456,48 @@ export default function MenuPage({
                 ×
               </button>
             </div>
-            <p>{selectedDish.description || 'Опис поки не додано'}</p>
-            {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
-            {selectedDish.recipe ? (
-              <div className="dish-recipe-block">
+            <div className="menu-tab-switch dish-view-switch" role="tablist" aria-label="Вкладки страви">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={dishViewTab === 'details'}
+                className={dishViewTab === 'details' ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+                onClick={() => setDishViewTab('details')}
+              >
+                деталі
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={dishViewTab === 'recipe'}
+                className={dishViewTab === 'recipe' ? 'menu-tab-switch-button menu-tab-switch-button--active' : 'menu-tab-switch-button'}
+                onClick={() => setDishViewTab('recipe')}
+              >
+                рецепт
+              </button>
+            </div>
+
+            {dishViewTab === 'details' ? (
+              <>
+                <p>{selectedDish.description || 'Опис поки не додано'}</p>
+                {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
+                {selectedDishComponents.length ? (
+                  <div className="dish-components-block">
+                    <p>компоненти:</p>
+                    <ul>
+                      {selectedDishComponents.map((component, index) => (
+                        <li key={`${selectedDish.id}-menu-component-${index}`}>{component}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <div className="dish-modal-tags">
+                  <span>{selectedDish.mealCategoryName}</span>
+                  <span>{selectedDish.typeCategoryName}</span>
+                </div>
+              </>
+            ) : selectedDish.recipe ? (
+              <div className="dish-recipe-block dish-recipe-block--tab">
                 <div className="dish-recipe-header">
                   <p>рецепт:</p>
                   <button
@@ -455,24 +512,32 @@ export default function MenuPage({
                     </svg>
                   </button>
                 </div>
-                <pre>{selectedDish.recipe}</pre>
+
+                {hasStructuredRecipeSteps ? (
+                  <ol className="dish-recipe-timeline" aria-label="Кроки рецепта">
+                    {recipeSteps.map((stepText, index) => {
+                      const stepNumber = index + 1
+
+                      return (
+                        <li key={`${selectedDish.id}-menu-recipe-step-${stepNumber}`} className="dish-recipe-timeline-step">
+                          <div className="dish-recipe-timeline-rail" aria-hidden="true">
+                            <span className="dish-recipe-timeline-node">{stepNumber}</span>
+                          </div>
+                          <div className="dish-recipe-timeline-content">
+                            <p>{stepText}</p>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ol>
+                ) : (
+                  <pre>{selectedDish.recipe}</pre>
+                )}
                 {copyMessage ? <p className="dish-copy-message">{copyMessage}</p> : null}
               </div>
-            ) : null}
-            {selectedDishComponents.length ? (
-              <div className="dish-components-block">
-                <p>компоненти:</p>
-                <ul>
-                  {selectedDishComponents.map((component, index) => (
-                    <li key={`${selectedDish.id}-menu-component-${index}`}>{component}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <div className="dish-modal-tags">
-              <span>{selectedDish.mealCategoryName}</span>
-              <span>{selectedDish.typeCategoryName}</span>
-            </div>
+            ) : (
+              <p className="dish-recipe-empty">Рецепт поки не додано</p>
+            )}
           </section>
         </div>
       ) : null}

@@ -19,6 +19,7 @@ import {
   createCategoryInProject,
   createDish,
   createDishInProject,
+  deleteCategoryInProject,
   createMenuEntry,
   createMenuEntryInProject,
   createMenuSpecialEntryInProject,
@@ -811,6 +812,31 @@ app.post('/api/categories', authRequired, projectAccessRequired, projectEditorOr
 
     return res.status(500).json({ message: 'Не вдалося створити категорію' })
   }
+})
+
+app.delete('/api/categories/:id', authRequired, projectAccessRequired, projectEditorOrOwnerOrAdminRequired, (req, res) => {
+  const categoryId = Number(req.params.id)
+
+  if (!Number.isInteger(categoryId) || categoryId < 1) {
+    return res.status(400).json({ message: 'Некоректний id категорії' })
+  }
+
+  const category = getCategoryByIdInProject(categoryId, req.projectId)
+  if (!category) {
+    return res.status(404).json({ message: 'Категорію не знайдено' })
+  }
+
+  const deleted = deleteCategoryInProject({ id: categoryId, projectId: req.projectId })
+
+  if (!deleted.deleted && deleted.reason === 'CATEGORY_IN_USE') {
+    return res.status(409).json({ message: 'Спочатку приберіть усі страви з цієї категорії' })
+  }
+
+  if (!deleted.deleted) {
+    return res.status(404).json({ message: 'Категорію не знайдено' })
+  }
+
+  return res.status(204).send()
 })
 
 app.get('/api/dishes', authRequired, projectAccessRequired, (req, res) => {

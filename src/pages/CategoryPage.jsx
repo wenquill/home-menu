@@ -155,6 +155,7 @@ export default function CategoryPage({
   onDeleteDish,
   onGetDishById,
   onGenerateDishRecipe,
+  onDeleteCategory,
   onScheduleDishToMenu,
 }) {
   const ITEMS_PER_PAGE = 8
@@ -177,7 +178,9 @@ export default function CategoryPage({
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [isGeneratingEditRecipe, setIsGeneratingEditRecipe] = useState(false)
   const [dishToDelete, setDishToDelete] = useState(null)
+  const [categoryToDelete, setCategoryToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState('')
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false)
   const [isDeletingDish, setIsDeletingDish] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
   const [copyMessageTimeoutId, setCopyMessageTimeoutId] = useState(null)
@@ -222,6 +225,7 @@ export default function CategoryPage({
   const hasStructuredRecipeSteps = recipeSteps.length > 0
 
   const category = allCategories.find((item) => item.id === selectedCategoryId)
+  const canDeleteCurrentCategory = Boolean(isAdmin && category && !isFavoritesView && !isAllDishesView)
 
   if (!isFavoritesView && !isAllDishesView && !category && defaultCategoryId) {
     return <Navigate to={`/category/${defaultCategoryId}`} replace />
@@ -332,7 +336,7 @@ export default function CategoryPage({
   const isEmptyCategory = sortedVisibleDishes.length === 0
 
   useEffect(() => {
-    if (!selectedDish && !isEditModalOpen && !dishToDelete && !menuScheduleDish) {
+    if (!selectedDish && !isEditModalOpen && !dishToDelete && !categoryToDelete && !menuScheduleDish) {
       return undefined
     }
 
@@ -341,6 +345,7 @@ export default function CategoryPage({
         setSelectedDish(null)
         setIsEditModalOpen(false)
         setDishToDelete(null)
+        setCategoryToDelete(null)
         setMenuScheduleDish(null)
         setDeleteError('')
         setMenuScheduleError('')
@@ -349,7 +354,7 @@ export default function CategoryPage({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedDish, isEditModalOpen, dishToDelete, menuScheduleDish])
+  }, [selectedDish, isEditModalOpen, dishToDelete, categoryToDelete, menuScheduleDish])
 
   useEffect(() => {
     return () => {
@@ -373,6 +378,7 @@ export default function CategoryPage({
     setIsEditModalOpen(false)
     setEditStep(1)
     setDishToDelete(null)
+    setCategoryToDelete(null)
     setEditError('')
     setDeleteError('')
     setCopyMessage('')
@@ -639,6 +645,15 @@ export default function CategoryPage({
     setDeleteError('')
   }
 
+  const openDeleteCategoryModal = (item) => {
+    if (!item) {
+      return
+    }
+
+    setCategoryToDelete(item)
+    setDeleteError('')
+  }
+
   const deleteCurrentDish = async () => {
     if (!dishToDelete || !onDeleteDish) {
       return
@@ -654,6 +669,33 @@ export default function CategoryPage({
       setDeleteError(error.message)
     } finally {
       setIsDeletingDish(false)
+    }
+  }
+
+  const deleteCurrentCategory = async () => {
+    if (!categoryToDelete || !onDeleteCategory) {
+      return
+    }
+
+    setDeleteError('')
+    setIsDeletingCategory(true)
+
+    try {
+      await onDeleteCategory(categoryToDelete.id)
+      setCategoryToDelete(null)
+
+      const remainingCategories = allCategories.filter((item) => item.id !== categoryToDelete.id)
+      const fallbackCategory = remainingCategories[0]
+
+      if (fallbackCategory) {
+        window.location.assign(`/category/${fallbackCategory.id}`)
+      } else {
+        window.location.assign('/')
+      }
+    } catch (error) {
+      setDeleteError(error.message)
+    } finally {
+      setIsDeletingCategory(false)
     }
   }
 
@@ -737,18 +779,26 @@ export default function CategoryPage({
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
         />
-        <select
-          aria-label="Сортування страв"
-          value={sortBy}
-          onChange={(event) => setSortBy(event.target.value)}
-        >
-          <option value="newest">спочатку нові</option>
-          <option value="oldest">спочатку старі</option>
-          <option value="name-asc">назва: а-я</option>
-          <option value="name-desc">назва: я-а</option>
-          <option value="time-asc">час: менший-більший</option>
-          <option value="time-desc">час: більший-менший</option>
-        </select>
+        <div className="dish-search-row">
+          <select
+            aria-label="Сортування страв"
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+          >
+            <option value="newest">спочатку нові</option>
+            <option value="oldest">спочатку старі</option>
+            <option value="name-asc">назва: а-я</option>
+            <option value="name-desc">назва: я-а</option>
+            <option value="time-asc">час: менший-більший</option>
+            <option value="time-desc">час: більший-менший</option>
+          </select>
+
+          {canDeleteCurrentCategory ? (
+            <button type="button" className="category-delete-button" onClick={() => openDeleteCategoryModal(category)}>
+              видалити категорію
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {isEmptyCategory ? (
@@ -873,9 +923,9 @@ export default function CategoryPage({
 
             {dishViewTab === 'details' ? (
               <>
-              {selectedDish.description && (
-                <p>{selectedDish.description}</p>
-              )}
+                {selectedDish.description && (
+                  <p>{selectedDish.description}</p>
+                )}
                 {selectedDish.cookingTimeMinutes ? <p>час приготування: {selectedDish.cookingTimeMinutes} хв</p> : null}
                 {selectedDish.components?.length ? (
                   <div className="dish-components-block">
@@ -1139,6 +1189,39 @@ export default function CategoryPage({
               </button>
               <button type="button" className="dish-modal-danger" onClick={deleteCurrentDish} disabled={isDeletingDish}>
                 {isDeletingDish ? 'видаляю...' : 'видалити'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {categoryToDelete ? (
+        <div className="dish-modal-overlay" role="presentation" onClick={() => setCategoryToDelete(null)}>
+          <section
+            className="dish-modal dish-modal--confirm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Видалити категорію ${categoryToDelete.name}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="dish-modal-header">
+              <h2>Видалити категорію?</h2>
+              <button type="button" className="dish-modal-close" aria-label="Закрити" onClick={() => setCategoryToDelete(null)}>
+                ×
+              </button>
+            </div>
+            <p className="dish-modal-warning">
+              Категорія <strong>{categoryToDelete.name}</strong> буде видалена назавжди.
+            </p>
+
+            {deleteError ? <p className="state-message state-message--error">{deleteError}</p> : null}
+
+            <div className="dish-modal-actions dish-modal-actions--confirm">
+              <button type="button" className="dish-modal-secondary" onClick={() => setCategoryToDelete(null)}>
+                скасувати
+              </button>
+              <button type="button" className="dish-modal-danger" onClick={deleteCurrentCategory} disabled={isDeletingCategory}>
+                {isDeletingCategory ? 'видаляю...' : 'видалити'}
               </button>
             </div>
           </section>

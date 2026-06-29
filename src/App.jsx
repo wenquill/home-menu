@@ -298,6 +298,22 @@ function App() {
     return created
   }
 
+  const handleDeleteCategory = async (id) => {
+    if (!canManageProjectMenu) {
+      throw new Error('Недостатньо прав для видалення категорій')
+    }
+
+    await apiRequest(
+      `/api/categories/${id}`,
+      {
+        method: 'DELETE',
+      },
+      authToken,
+    )
+
+    await loadMenuData({ background: true })
+  }
+
   const handleAddDish = async (payload) => {
     if (!canManageProjectMenu) {
       throw new Error('Недостатньо прав для додавання страв')
@@ -757,6 +773,7 @@ function App() {
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
               onGenerateDishRecipe={handleGenerateDishRecipe}
+              onDeleteCategory={handleDeleteCategory}
               onScheduleDishToMenu={handleScheduleDishToMenu}
             />
           )}
@@ -777,6 +794,7 @@ function App() {
               onDeleteDish={handleDeleteDish}
               onGetDishById={handleGetDishById}
               onGenerateDishRecipe={handleGenerateDishRecipe}
+              onDeleteCategory={handleDeleteCategory}
               onScheduleDishToMenu={handleScheduleDishToMenu}
             />
           )}

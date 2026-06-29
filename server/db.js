@@ -1043,6 +1043,35 @@ export function createCategoryInProject({ name, kind, projectId }) {
     .get(result.lastInsertRowid)
 }
 
+export function deleteCategoryInProject({ id, projectId }) {
+  const categoryId = Number(id)
+  const normalizedProjectId = Number(projectId)
+
+  if (!Number.isInteger(categoryId) || categoryId < 1) {
+    return { deleted: false, reason: 'INVALID_ID' }
+  }
+
+  const usage = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM dishes
+       WHERE project_id = ? AND (meal_category_id = ? OR type_category_id = ?)`,
+    )
+    .get(normalizedProjectId, categoryId, categoryId)
+
+  if ((usage?.count || 0) > 0) {
+    return { deleted: false, reason: 'CATEGORY_IN_USE' }
+  }
+
+  const result = db
+    .prepare('DELETE FROM categories WHERE id = ? AND project_id = ?')
+    .run(categoryId, normalizedProjectId)
+
+  return {
+    deleted: result.changes > 0,
+  }
+}
+
 export function getDishes(categoryId) {
   if (categoryId) {
     const dishes = db
