@@ -27,6 +27,8 @@ import {
   deleteProjectById,
   deleteDish,
   deleteMenuEntryById,
+  getDishCookStatsByProject,
+  setMenuEntryCookedInProject,
   deleteMenuSpecialEntryByIdInProject,
   getDishById,
   getDishByIdInProject,
@@ -1569,6 +1571,38 @@ app.post('/api/menu-plan', authRequired, projectAccessRequired, (req, res) => {
 
     return res.status(400).json({ message: error.message })
   }
+})
+
+app.patch('/api/menu-plan/:id/cooked', authRequired, projectAccessRequired, (req, res) => {
+  const menuEntryId = Number(req.params.id)
+  const isCooked = Boolean(req.body.isCooked)
+
+  if (!Number.isInteger(menuEntryId) || menuEntryId < 1) {
+    return res.status(400).json({ message: 'Некоректний id елемента меню' })
+  }
+
+  const updated = setMenuEntryCookedInProject({
+    id: menuEntryId,
+    projectId: req.projectId,
+    isCooked,
+  })
+
+  if (!updated) {
+    return res.status(404).json({ message: 'Елемент меню не знайдено' })
+  }
+
+  return res.json(updated)
+})
+
+app.get('/api/menu-plan/cook-stats', authRequired, projectAccessRequired, (req, res) => {
+  const limit = req.query.limit ? Number(req.query.limit) : 10
+
+  if (Number.isNaN(limit) || limit < 1 || limit > 100) {
+    return res.status(400).json({ message: 'limit має бути числом від 1 до 100' })
+  }
+
+  const stats = getDishCookStatsByProject(req.projectId, limit)
+  return res.json({ stats })
 })
 
 app.delete('/api/menu-plan/:id', authRequired, projectAccessRequired, (req, res) => {

@@ -45,6 +45,7 @@ export default function DashboardPage({
   onLoadTodayMenuEntries,
   onLoadShoppingList,
   onLoadDashboardStats,
+  onLoadDishCookStats,
   onScheduleDishToMenu,
   canManageProjectMenu,
 }) {
@@ -56,6 +57,7 @@ export default function DashboardPage({
     newSavedRecipesCount: 0,
     completedPurchasesCount: 0,
   })
+  const [cookStats, setCookStats] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [pageError, setPageError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
@@ -70,10 +72,11 @@ export default function DashboardPage({
     setPageError('')
 
     try {
-      const [menuEntries, shoppingData, statsData] = await Promise.all([
+      const [menuEntries, shoppingData, statsData, cookStatsData] = await Promise.all([
         onLoadTodayMenuEntries?.(todayDate),
         onLoadShoppingList?.(),
         onLoadDashboardStats?.(),
+        onLoadDishCookStats?.(),
       ])
 
       setTodayMenuEntries(Array.isArray(menuEntries) ? menuEntries : [])
@@ -83,6 +86,7 @@ export default function DashboardPage({
         newSavedRecipesCount: Number(statsData?.newSavedRecipesCount || 0),
         completedPurchasesCount: Number(statsData?.completedPurchasesCount || 0),
       })
+      setCookStats(Array.isArray(cookStatsData?.stats) ? cookStatsData.stats : [])
     } catch (error) {
       setPageError(error.message)
     } finally {
@@ -238,6 +242,24 @@ export default function DashboardPage({
               </div>
             </div>
           </article>
+
+          {cookStats.length > 0 ? (
+            <article className="admin-panel dashboard-card dashboard-card--wide">
+              <div className="dashboard-card-header">
+                <h2>найчастіше готували</h2>
+                <span>за весь час</span>
+              </div>
+              <ul className="dashboard-list dashboard-cook-stats-list">
+                {cookStats.map((item, index) => (
+                  <li key={item.dishId} className="dashboard-cook-stats-item">
+                    <span className="dashboard-cook-stats-rank">{index + 1}</span>
+                    <strong className="dashboard-cook-stats-title">{item.dishTitle}</strong>
+                    <span className="dashboard-cook-stats-count">{item.cookCount} {item.cookCount === 1 ? 'раз' : item.cookCount < 5 ? 'рази' : 'разів'}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
 
         </section>
       ) : null}

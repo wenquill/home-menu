@@ -43,7 +43,7 @@ function getMenuSpecialSourceLabel(sourceType) {
   return 'інше'
 }
 
-function DishCard({ dish, onOpen, onRemoveFromMenu }) {
+function DishCard({ dish, onOpen, onRemoveFromMenu, onToggleCooked }) {
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
@@ -85,16 +85,28 @@ function DishCard({ dish, onOpen, onRemoveFromMenu }) {
           </span>
         ) : null}
       </div>
-      <button
-        type="button"
-        className="dish-add-to-menu-button dish-remove-from-menu-button"
-        onClick={(event) => {
-          event.stopPropagation()
-          onRemoveFromMenu()
-        }}
-      >
-        прибрати з меню
-      </button>
+      <div className="menu-dish-card-actions">
+        <button
+          type="button"
+          className={dish.isCooked ? 'menu-cooked-button menu-cooked-button--active' : 'menu-cooked-button'}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleCooked()
+          }}
+        >
+          {dish.isCooked ? '✓ приготовано' : 'позначити як приготоване'}
+        </button>
+        <button
+          type="button"
+          className="dish-remove-from-menu-button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemoveFromMenu()
+          }}
+        >
+          прибрати
+        </button>
+      </div>
     </article>
   )
 }
@@ -112,7 +124,7 @@ function SpecialPlanCard({ entry, onRemove }) {
       </div>
       <button
         type="button"
-        className="dish-add-to-menu-button dish-remove-from-menu-button"
+        className="dish-add-to-menu-button dish-remove-from-menu-button-alt"
         onClick={() => {
           onRemove()
         }}
@@ -126,6 +138,7 @@ function SpecialPlanCard({ entry, onRemove }) {
 export default function MenuPage({
   onLoadMenuEntries,
   onRemoveMenuEntry,
+  onToggleMenuEntryCooked,
   onLoadSpecialMenuEntries,
   onCreateSpecialMenuEntry,
   onDeleteSpecialMenuEntry,
@@ -298,6 +311,34 @@ export default function MenuPage({
     await loadEntries()
   }
 
+  const toggleCooked = async (menuEntryId, currentIsCooked) => {
+    if (!onToggleMenuEntryCooked) {
+      return
+    }
+
+    const nextIsCooked = !currentIsCooked
+
+    setMenuEntries((prev) =>
+      prev.map((entry) =>
+        entry.menuEntryId === menuEntryId
+          ? { ...entry, isCooked: nextIsCooked }
+          : entry,
+      ),
+    )
+
+    try {
+      await onToggleMenuEntryCooked(menuEntryId, nextIsCooked)
+    } catch (_error) {
+      setMenuEntries((prev) =>
+        prev.map((entry) =>
+          entry.menuEntryId === menuEntryId
+            ? { ...entry, isCooked: currentIsCooked }
+            : entry,
+        ),
+      )
+    }
+  }
+
   const closeSpecialModal = () => {
     setIsSpecialModalOpen(false)
     setSpecialSourceType('DELIVERY')
@@ -406,6 +447,9 @@ export default function MenuPage({
                 onOpen={() => setSelectedDish(dish)}
                 onRemoveFromMenu={() => {
                   void removeFromMenu(dish.menuEntryId)
+                }}
+                onToggleCooked={() => {
+                  void toggleCooked(dish.menuEntryId, Boolean(dish.isCooked))
                 }}
               />
             ))

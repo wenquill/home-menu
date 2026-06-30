@@ -238,7 +238,7 @@ export default function TopMenu({
                     ) : null}
                     <button
                       type="button"
-                      className="menu-link menu-link--button"
+                      className="menu-link menu-link--button-logout"
                       onClick={() => setIsLogoutConfirmOpen(true)}
                     >
                       вийти
@@ -271,7 +271,7 @@ export default function TopMenu({
                   </NavLink>
                   <button
                     type="button"
-                    className="menu-link menu-link--button"
+                    className="menu-link menu-link--button-logout"
                     onClick={() => setIsLogoutConfirmOpen(true)}
                   >
                     вийти

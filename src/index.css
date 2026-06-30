@@ -392,6 +392,11 @@ body {
   width: 100%;
 }
 
+.menu-link--button-logout {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .menu-profile-link {
   display: inline-flex;
   align-items: center;
@@ -645,11 +650,6 @@ body {
   padding: 12px;
   cursor: pointer;
   min-width: 0;
-}
-
-.saved-recipe-card--tried {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px rgba(var(--accent-card-glow-rgb), 0.5) inset;
 }
 
 .saved-recipe-card h3 {
@@ -1550,6 +1550,9 @@ body {
 
 .dish-add-to-menu-button {
   margin-top: 12px;
+}
+
+.dish-add-to-menu-button, .dish-remove-from-menu-button {
   width: 100%;
   border: 1px solid var(--btn-border);
   background: var(--btn-bg);
@@ -1569,6 +1572,78 @@ body {
   background: var(--btn-bg);
   border-color: var(--btn-border);
   color: var(--btn-text);
+}
+
+.dish-remove-from-menu-button-alt {
+  margin-top: 12px;
+  background: var(--btn-bg);
+  border-color: var(--btn-border);
+  color: var(--btn-text);
+}
+
+.menu-dish-card-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.menu-cooked-button {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.menu-cooked-button--active {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.menu-cooked-button:hover {
+  border-color: #16a34a;
+  color: #15803d;
+}
+
+.dashboard-cook-stats-list {
+  gap: 6px;
+}
+
+.dashboard-cook-stats-item {
+  display: grid !important;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-cook-stats-rank {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  text-align: center;
+}
+
+.dashboard-cook-stats-title {
+  font-size: 14px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-cook-stats-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .dish-modal-overlay {
@@ -2587,6 +2662,7 @@ body {
 
 .shopping-list-items {
   margin: 0;
+  margin-top: 12px;
   padding: 0;
   list-style: none;
   display: grid;

@@ -406,6 +406,21 @@ function App() {
     )
   }
 
+  const handleToggleMenuEntryCooked = async (menuEntryId, isCooked) => {
+    return apiRequest(
+      `/api/menu-plan/${menuEntryId}/cooked`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ isCooked }),
+      },
+      authToken,
+    )
+  }
+
+  const handleLoadDishCookStats = async () => {
+    return apiRequest('/api/menu-plan/cook-stats', {}, authToken)
+  }
+
   const handleAddSpecialMenuEntry = async ({ menuDate, sourceType, title, notes }) => {
     return apiRequest(
       '/api/menu-special',
@@ -753,6 +768,7 @@ function App() {
               onLoadShoppingList={handleLoadShoppingList}
               onLoadSavedRecipes={handleLoadSavedRecipes}
               onLoadDashboardStats={handleLoadDashboardStats}
+              onLoadDishCookStats={handleLoadDishCookStats}
               onScheduleDishToMenu={handleScheduleDishToMenu}
               canManageProjectMenu={canManageProjectMenu}
             />
@@ -805,6 +821,7 @@ function App() {
             <MenuPage
               onLoadMenuEntries={handleGetMenuEntriesByDate}
               onRemoveMenuEntry={handleRemoveDishFromMenu}
+              onToggleMenuEntryCooked={handleToggleMenuEntryCooked}
               onLoadSpecialMenuEntries={handleGetMenuSpecialEntriesByDate}
               onCreateSpecialMenuEntry={handleAddSpecialMenuEntry}
               onDeleteSpecialMenuEntry={handleRemoveSpecialMenuEntry}

@@ -717,6 +717,12 @@ export function initializeDatabase() {
   const menuEntryColumns = db.prepare("PRAGMA table_info('menu_entries')").all()
   const hasMenuEntryTable = menuEntryColumns.length > 0
   const hasMenuEntryProjectColumn = menuEntryColumns.some((column) => column.name === 'project_id')
+  const hasMenuEntryIsCookedColumn = menuEntryColumns.some((column) => column.name === 'is_cooked')
+
+  if (hasMenuEntryTable && !hasMenuEntryIsCookedColumn) {
+    db.exec('ALTER TABLE menu_entries ADD COLUMN is_cooked INTEGER NOT NULL DEFAULT 0')
+    db.exec('ALTER TABLE menu_entries ADD COLUMN cooked_at TEXT')
+  }
 
   if (!hasMenuEntryTable) {
     db.exec(`
@@ -1394,6 +1400,46 @@ export function deleteMenuEntryById(id) {
   return result.changes > 0
 }
 
+export function setMenuEntryCookedInProject({ id, projectId, isCooked }) {
+  const menuEntryId = Number(id)
+  const normalizedProjectId = Number(projectId)
+
+  const row = db
+    .prepare('SELECT id FROM menu_entries WHERE id = ? AND project_id = ?')
+    .get(menuEntryId, normalizedProjectId)
+
+  if (!row) {
+    return null
+  }
+
+  const cookedAt = isCooked ? new Date().toISOString() : null
+
+  db.prepare('UPDATE menu_entries SET is_cooked = ?, cooked_at = ? WHERE id = ?')
+    .run(isCooked ? 1 : 0, cookedAt, menuEntryId)
+
+  return db
+    .prepare('SELECT id, is_cooked AS isCooked, cooked_at AS cookedAt FROM menu_entries WHERE id = ?')
+    .get(menuEntryId)
+}
+
+export function getDishCookStatsByProject(projectId, limit = 10) {
+  return db
+    .prepare(
+      `SELECT
+        d.id AS dishId,
+        d.title AS dishTitle,
+        COUNT(*) AS cookCount
+       FROM menu_entries me
+       JOIN dishes d ON d.id = me.dish_id
+       WHERE me.project_id = ?
+         AND me.is_cooked = 1
+       GROUP BY me.dish_id
+       ORDER BY cookCount DESC, d.title ASC
+       LIMIT ?`,
+    )
+    .all(projectId, limit)
+}
+
 export function getMenuEntriesByDate(menuDate) {
   const normalizedDate = normalizeMenuDate(menuDate)
 
@@ -1431,6 +1477,8 @@ export function getMenuEntriesByDateInProject(menuDate, projectId) {
       `SELECT
         me.id AS menuEntryId,
         me.menu_date AS menuDate,
+        me.is_cooked AS isCooked,
+        me.cooked_at AS cookedAt,
         d.id,
         d.title,
         d.description,
